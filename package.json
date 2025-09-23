@@ -1,0 +1,32 @@
+{
+  "name": "utxos-parse",
+  "version": "1.0.0",
+  "description": "Tool to convert a compact-serialized UTXO set to a SQLite3 database",
+  "main": "utxo_to_sqlite.ts",
+  "scripts": {
+    "start": "bun run utxo_to_sqlite.ts",
+    "dev": "bun --watch run utxo_to_sqlite.ts"
+  },
+  "keywords": [
+    "bitcoin",
+    "utxo",
+    "sqlite",
+    "blockchain"
+  ],
+  "author": "Bitcoin Core developers",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "^1.2.22",
+    "@types/node": "^24.5.2",
+    "bun-types": "^1.2.22",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "bitcoinjs-lib": "^6.1.7"
+  }
+}
