@@ -15,7 +15,9 @@ describe("computeScripthash", () => {
       hex("88ac"),
     ]);
     const scripthash = computeScripthash(script);
-    expect(scripthash).toBe("5546fc69d399ef99854c132abb060381cc159dbec67c496a6f0e0dbf12e83ae8");
+    expect(Buffer.isBuffer(scripthash)).toBe(true);
+    expect(scripthash.length).toBe(32);
+    expect(scripthash.toString("hex")).toBe("5546fc69d399ef99854c132abb060381cc159dbec67c496a6f0e0dbf12e83ae8");
   });
 
   test("P2SH script", () => {
@@ -27,7 +29,9 @@ describe("computeScripthash", () => {
       hex("87"),
     ]);
     const scripthash = computeScripthash(script);
-    expect(scripthash).toBe("7914236249d96d4931978817b2fe3c9071e8b4daf4decd3087dbba955fd7f66f");
+    expect(Buffer.isBuffer(scripthash)).toBe(true);
+    expect(scripthash.length).toBe(32);
+    expect(scripthash.toString("hex")).toBe("7914236249d96d4931978817b2fe3c9071e8b4daf4decd3087dbba955fd7f66f");
   });
 
   test("P2PK compressed pubkey", () => {
@@ -38,7 +42,9 @@ describe("computeScripthash", () => {
       hex("ac"),
     ]);
     const scripthash = computeScripthash(script);
-    expect(scripthash).toBe("3babce0e0ce27d2dea6a599bef2aed2a2b25c0f1aa0998afa948a353a1713b1d");
+    expect(Buffer.isBuffer(scripthash)).toBe(true);
+    expect(scripthash.length).toBe(32);
+    expect(scripthash.toString("hex")).toBe("3babce0e0ce27d2dea6a599bef2aed2a2b25c0f1aa0998afa948a353a1713b1d");
   });
 });
 
