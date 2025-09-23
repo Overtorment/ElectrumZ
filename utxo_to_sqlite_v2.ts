@@ -14,7 +14,7 @@ The created database contains a table `utxos` with the following schema:
 import { Database } from "bun:sqlite";
 import { parseArgs } from "util";
 import { existsSync } from "fs";
-import { createHash } from "node:crypto";
+import { computeScripthash } from "./scripthash";
 
 const UTXO_DUMP_MAGIC = Buffer.from([0x75, 0x74, 0x78, 0x6f, 0xff]); // 'utxo\xff'
 const UTXO_DUMP_VERSION = 2;
@@ -171,16 +171,6 @@ async function decompressScript(reader: StreamingBinaryReader): Promise<Buffer> 
     if (scriptSize > 10000) throw new Error(`too long script with size ${scriptSize}`);
     return reader.read(scriptSize);
   }
-}
-
-function bitcoinjs_crypto_sha256(buffer: Buffer): Buffer {
-  return createHash("sha256").update(buffer).digest();
-}
-
-function computeScripthash(script: Buffer): string {
-  const hash = bitcoinjs_crypto_sha256(script);
-  const reversedHash = Buffer.from(hash).reverse();
-  return reversedHash.toString("hex");
 }
 
 async function main(): Promise<void> {
