@@ -198,7 +198,18 @@ async function main(): Promise<void> {
   }
 
   const db = new Database(outfile);
-  db.exec("CREATE TABLE utxos(outpoint BLOB, value INT, height INT, scripthash BLOB, CHECK(length(outpoint) = 36), CHECK(length(scripthash) = 32))");
+  db.exec(`
+PRAGMA journal_mode=OFF;
+PRAGMA synchronous=OFF;
+PRAGMA locking_mode=EXCLUSIVE;
+PRAGMA temp_store=MEMORY;
+PRAGMA cache_size=-1048576;
+PRAGMA page_size=32768;
+PRAGMA mmap_size=1073741824;
+PRAGMA foreign_keys=OFF;
+`);
+  db.exec("CREATE TABLE utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)");
+  db.exec("BEGIN IMMEDIATE");
   // db.exec("CREATE INDEX idx_utxos_scripthash ON utxos(scripthash)");
 
   const file = Bun.file(infile);
@@ -233,9 +244,9 @@ async function main(): Promise<void> {
   let maxHeight = 0;
 
   const insertStmt = db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");
-  const insertMany = db.transaction((rows: Array<[Buffer, number, number, Buffer]>) => {
+  const insertMany = (rows: Array<[Buffer, number, number, Buffer]>) => {
     for (const r of rows) insertStmt.run(...r);
-  });
+  };
 
   for (let coinIdx = 1; coinIdx <= numUtxos; coinIdx++) {
     if (coinsPerHashLeft === 0) {
@@ -266,7 +277,7 @@ async function main(): Promise<void> {
       console.log(`    scripthash = ${scripthash.toString("hex")}\n`);
     }
 
-    if (coinIdx % (16 * 1024) === 0 || coinIdx === numUtxos) {
+    if (coinIdx % (64 * 1024) === 0 || coinIdx === numUtxos) {
       insertMany(writeBatch);
       writeBatch.length = 0;
     }
@@ -280,7 +291,7 @@ async function main(): Promise<void> {
       );
     }
   }
-
+  db.exec("COMMIT");
   db.close();
   console.log(`TOTAL: ${numUtxos} coins written to ${outfile}, snapshot height is ${maxHeight}.`);
 

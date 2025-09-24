@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@noble/hashes": "^2.0.1",
-    "bitcoinjs-lib": "^6.1.7"
+    "bitcoinjs-lib": "^6.1.7",
+    "jayson": "^4.2.0"
   }
 }
