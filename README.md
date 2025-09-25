@@ -8,8 +8,6 @@ With that data it can implement following RPC  methods:
 * `blockchain.scripthash.get_balance`
 * `blockchain.scripthash.get_history` (**limited data**)
 * `blockchain.scripthash.listunspent`
-* `blockchain.scripthash.subscribe` ???
-* `blockchain.scripthash.unsubscribe` ???
 
 Following methods will be proxied to Bitcoin Core:
 
@@ -30,3 +28,4 @@ For reference
 ------------
 
 * https://electrum-protocol.readthedocs.io/en/latest/protocol-methods.html
+* https://github.com/bitcoin/bitcoin/blob/master/contrib/utxo-tools/utxo_to_sqlite.py
