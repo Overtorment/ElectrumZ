@@ -1,12 +1,23 @@
+import { openSync, readSync, closeSync, statSync } from "fs";
+
 export class StreamingBinaryReader {
-  private file: Blob;
+  private blob: Blob | null = null;
+  private fd: number | null = null;
+  private fileSize: number = 0;
   private position: number = 0;
   private buffer: Buffer = Buffer.alloc(0);
   private bufferStart: number = 0;
-  private readonly bufferSize: number = 64 * 1024;
+  private readonly bufferSize: number;
 
-  constructor(file: Blob) {
-    this.file = file;
+  constructor(source: Blob | string, options?: { bufferSize?: number }) {
+    this.bufferSize = options?.bufferSize ?? 4 * 1024 * 1024; // 4 MiB default for large files
+    if (typeof source === "string") {
+      this.fd = openSync(source, "r");
+      this.fileSize = statSync(source).size;
+    } else {
+      this.blob = source;
+      this.fileSize = (source as any).size;
+    }
   }
 
   private async ensureBuffer(minBytes: number): Promise<void> {
@@ -16,7 +27,18 @@ export class StreamingBinaryReader {
 
     const readStart = this.position;
     const readSize = Math.max(this.bufferSize, minBytes);
-    const slice = (this.file as any).slice(readStart, readStart + readSize);
+
+    if (this.fd !== null) {
+      // Allocate a fresh buffer to preserve previously returned subarrays
+      const buf = Buffer.allocUnsafe(readSize);
+      const bytesRead = readSync(this.fd, buf, 0, readSize, readStart);
+      this.buffer = bytesRead === buf.length ? buf : buf.subarray(0, bytesRead);
+      this.bufferStart = readStart;
+      return;
+    }
+
+    // Fallback: Blob-based read (may incur extra copy via ArrayBuffer)
+    const slice = (this.blob as any).slice(readStart, readStart + readSize);
     const ab = await slice.arrayBuffer();
     this.buffer = Buffer.from(ab);
     this.bufferStart = readStart;
@@ -32,27 +54,46 @@ export class StreamingBinaryReader {
   }
 
   async readUInt8(): Promise<number> {
-    const b = await this.read(1);
-    return b[0];
+    await this.ensureBuffer(1);
+    const relPos = this.position - this.bufferStart;
+    const value = this.buffer[relPos];
+    this.position += 1;
+    return value;
   }
 
   async readUInt16LE(): Promise<number> {
-    const b = await this.read(2);
-    return b.readUInt16LE(0);
+    await this.ensureBuffer(2);
+    const relPos = this.position - this.bufferStart;
+    const value = this.buffer.readUInt16LE(relPos);
+    this.position += 2;
+    return value;
   }
 
   async readUInt32LE(): Promise<number> {
-    const b = await this.read(4);
-    return b.readUInt32LE(0);
+    await this.ensureBuffer(4);
+    const relPos = this.position - this.bufferStart;
+    const value = this.buffer.readUInt32LE(relPos);
+    this.position += 4;
+    return value;
   }
 
   async readBigUInt64LE(): Promise<bigint> {
-    const b = await this.read(8);
-    return b.readBigUInt64LE(0);
+    await this.ensureBuffer(8);
+    const relPos = this.position - this.bufferStart;
+    const value = this.buffer.readBigUInt64LE(relPos);
+    this.position += 8;
+    return value;
   }
 
   async isAtEnd(): Promise<boolean> {
-    return this.position >= (this.file as any).size;
+    return this.position >= this.fileSize;
+  }
+
+  close(): void {
+    if (this.fd !== null) {
+      closeSync(this.fd);
+      this.fd = null;
+    }
   }
 }
 

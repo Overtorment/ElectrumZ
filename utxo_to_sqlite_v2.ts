@@ -142,8 +142,7 @@ async function main(): Promise<void> {
   handle.beginImmediate();
   // db.exec("CREATE INDEX idx_utxos_scripthash ON utxos(scripthash)");
 
-  const file = Bun.file(infile);
-  const reader = new StreamingBinaryReader(file);
+  const reader = new StreamingBinaryReader(infile, { bufferSize: 32 * 1024 * 1024 });
 
   const magicBytes = await reader.read(5);
   const version = await reader.readUInt16LE();
@@ -223,6 +222,7 @@ async function main(): Promise<void> {
   }
   handle.commit();
   handle.close();
+  reader.close();
   console.log(`TOTAL: ${numUtxos} coins written to ${outfile}, snapshot height is ${maxHeight}.`);
 
   if (!(await reader.isAtEnd())) {
