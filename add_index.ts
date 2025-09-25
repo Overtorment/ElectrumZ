@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   }
 
   const start = Date.now();
-  const handle = openDatabase(dbfile, { pragmasProfile: "bulkload" });
+  const handle = openDatabase(dbfile, { pragmasProfile: "indexbuild" });
   handle.beginImmediate();
   handle.ensureScripthashIndex();
   handle.commit();

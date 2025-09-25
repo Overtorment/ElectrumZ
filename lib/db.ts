@@ -1,4 +1,5 @@
 import { Database, Statement } from "bun:sqlite";
+import { availableParallelism } from "os";
 
 export type UtxoRow = [Buffer, number, number, Buffer];
 
@@ -13,7 +14,7 @@ export interface DbHandle {
 	ensureScripthashIndex(): void;
 }
 
-export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" }): DbHandle {
+export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" }): DbHandle {
 	const db = new Database(path);
 	const profile = opts?.pragmasProfile ?? "default";
 	applyPragmas(db, profile);
@@ -23,7 +24,9 @@ export function openDatabase(path: string, opts?: { createSchema?: boolean; prag
 	return wrap(db);
 }
 
-function applyPragmas(db: Database, profile: "bulkload" | "default"): void {
+function applyPragmas(db: Database, profile: "bulkload" | "default" | "readonly" | "indexbuild"): void {
+	console.log(`Applying SQLite PRAGMA profile: ${profile}`);
+	const threads = availableParallelism();
 	if (profile === "bulkload") {
 		db.exec(`
 PRAGMA journal_mode=OFF;
@@ -33,8 +36,36 @@ PRAGMA temp_store=MEMORY;
 PRAGMA cache_size=-1048576;
 PRAGMA page_size=32768;
 PRAGMA mmap_size=1073741824;
+PRAGMA threads=${threads};
 PRAGMA foreign_keys=OFF;
 `);
+		console.log(`SQLite PRAGMA threads set to ${threads}`);
+	} else if (profile === "readonly") {
+		db.exec(`
+PRAGMA query_only=ON;
+PRAGMA locking_mode=NORMAL;
+PRAGMA temp_store=MEMORY;
+PRAGMA cache_size=-262144;
+PRAGMA mmap_size=1073741824;
+PRAGMA threads=${threads};
+PRAGMA automatic_index=ON;
+PRAGMA foreign_keys=OFF;
+PRAGMA busy_timeout=1000;
+`);
+		console.log(`SQLite PRAGMA threads set to ${threads} (readonly)`);
+	} else if (profile === "indexbuild") {
+		db.exec(`
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA locking_mode=NORMAL;
+PRAGMA temp_store=MEMORY;
+PRAGMA cache_size=-524288;
+PRAGMA mmap_size=1073741824;
+PRAGMA threads=${threads};
+PRAGMA foreign_keys=OFF;
+PRAGMA busy_timeout=10000;
+`);
+		console.log(`SQLite PRAGMA threads set to ${threads} (indexbuild)`);
 	} else {
 		db.exec(`
 PRAGMA journal_mode=WAL;
