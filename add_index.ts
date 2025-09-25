@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { Database } from "bun:sqlite";
+import { openDatabase } from "./lib/db";
 import { existsSync } from "fs";
 import { parseArgs } from "util";
 
@@ -17,23 +17,11 @@ async function main(): Promise<void> {
   }
 
   const start = Date.now();
-  const db = new Database(dbfile);
-  db.exec(`
-PRAGMA journal_mode=OFF;
-PRAGMA synchronous=OFF;
-PRAGMA locking_mode=EXCLUSIVE;
-PRAGMA temp_store=MEMORY;
-PRAGMA cache_size=-1048576;
-`);
-
-  db.exec("BEGIN IMMEDIATE");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_scripthash ON utxos(scripthash)");
-  db.exec("COMMIT");
-
-  // Optionally gather statistics for query planner
-  // db.exec("ANALYZE");
-
-  db.close();
+  const handle = openDatabase(dbfile, { pragmasProfile: "bulkload" });
+  handle.beginImmediate();
+  handle.ensureScripthashIndex();
+  handle.commit();
+  handle.close();
   const elapsed = ((Date.now() - start) / 1000).toFixed(3);
   console.log(`Index 'idx_utxos_scripthash' created on '${dbfile}' in ${elapsed}s.`);
 }

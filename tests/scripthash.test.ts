@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { computeScripthash } from "../scripthash";
+import { computeScripthash } from "../lib/scripthash";
 
 function hex(hexString: string): Buffer {
   return Buffer.from(hexString.replace(/^0x/, ""), "hex");
