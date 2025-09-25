@@ -32,7 +32,7 @@ const server = new Server({
       return { confirmed, unconfirmed: 0 };
     } catch (e) {
       console.error(`[get_balance] error:`, e);
-      return { confirmed: 0, unconfirmed: 0 };
+      throw server.error(501, `[get_balance] error: ` +  e.message);
     }
   },
   "blockchain.scripthash.get_history": async (params: unknown) => {
@@ -61,7 +61,7 @@ const server = new Server({
       return result;
     } catch (e) {
       console.error(`[get_history] error:`, e);
-      return [] as Array<{ height: number; tx_hash: string }>;
+      throw server.error(501, `[get_history] error: ` +  e.message);
     }
   },
   "blockchain.scripthash.listunspent": async (params: unknown) => {
@@ -91,7 +91,7 @@ const server = new Server({
       return result;
     } catch (e) {
       console.error(`[listunspent] error:`, e);
-      return [] as Array<{ height: number; tx_pos: number; tx_hash: string; value: number }>;
+      throw server.error(501, `[listunspent] error: ` +  e.message);
     }
   },
 }, {
@@ -113,5 +113,6 @@ const server = new Server({
   },
 });
 
-server.tcp().listen(4000); // TCP on :4000
-console.log("jayson TCP listening on 4000");
+const tcpPort = process.env.TCP_PORT ?? 50011;
+server.tcp().listen(tcpPort); // TCP on :4000
+console.log("jayson TCP listening on " + tcpPort);
