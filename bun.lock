@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "utxos-parse",
+      "name": "electrumz",
       "dependencies": {
         "@noble/hashes": "^2.0.1",
         "bitcoinjs-lib": "^6.1.7",
