@@ -3,13 +3,26 @@ ElectrumZ
 
 Minimalistic Electrum server implementation that indexes and serves only chainstate data (aka UTXO)
 
-With that data it can implement following RPC  methods:
+Pros:
+
+* takes way less disk space, ~20 Gb
+* fast to index: all done in less than an hour
+* works: you can see your balance, and get data to construct spending transactions
+
+Cons:
+
+* cant serve historic data: will show only your recent transactions (the ones that have unspent outputs to you)
+* because of the above, cant be used to import seeds in wallets from scratch: not all funds might be detected (might need huge gap_limit)
+* doesnt work with mempool, so cant tell anything about unconfirmed transactions or do fee estimation based on mempool
+* must be initially synced on the same machine where Bitcoin Core is (to access utxo dump)
+
+### With that data it can implement following RPC  methods:
 
 * `blockchain.scripthash.get_balance`
 * `blockchain.scripthash.get_history` (**limited data**)
 * `blockchain.scripthash.listunspent`
 
-Following methods will be proxied to Bitcoin Core:
+### Following methods will be proxied to Bitcoin Core:
 
 * `blockchain.transaction.broadcast`
 * `blockchain.transaction.get`
@@ -22,6 +35,14 @@ How it works:
 1. Add indexes
 1. Ready to serve!
 1. Launch worker that watches for new blocks and updates UTXOs in sqlite database
+
+TODO
+----
+
+* [ ] add worker to catch up after initial data ingestion (delete spent utxos, add new utxos)
+* [ ] implement missing less-important JSON-RPC methods
+* [ ] add TLS & Websocket servers
+* [ ] handle reorgs
 
 
 For reference
