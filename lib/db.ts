@@ -8,13 +8,14 @@ export interface DbHandle {
 	close(): void;
 	beginImmediate(): void;
 	commit(): void;
+	rollback(): void;
 	prepareInsert(): Statement<UtxoRow>;
 	insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>): void;
 	createSchema(): void;
 	ensureScripthashIndex(): void;
 }
 
-export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" }): DbHandle {
+export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain" }): DbHandle {
 	const db = new Database(path);
 	const profile = opts?.pragmasProfile ?? "default";
 	applyPragmas(db, profile);
@@ -24,7 +25,7 @@ export function openDatabase(path: string, opts?: { createSchema?: boolean; prag
 	return wrap(db);
 }
 
-function applyPragmas(db: Database, profile: "bulkload" | "default" | "readonly" | "indexbuild"): void {
+function applyPragmas(db: Database, profile: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain"): void {
 	console.log(`Applying SQLite PRAGMA profile: ${profile}`);
 	const threads = availableParallelism();
 	if (profile === "bulkload") {
@@ -66,6 +67,21 @@ PRAGMA foreign_keys=OFF;
 PRAGMA busy_timeout=10000;
 `);
 		console.log(`SQLite PRAGMA threads set to ${threads} (indexbuild)`);
+	} else if (profile === "blockchain") {
+		db.exec(`
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA locking_mode=NORMAL;
+PRAGMA temp_store=MEMORY;
+PRAGMA cache_size=-524288;
+PRAGMA page_size=32768;
+PRAGMA mmap_size=1073741824;
+PRAGMA threads=${threads};
+PRAGMA foreign_keys=OFF;
+PRAGMA busy_timeout=5000;
+PRAGMA optimize;
+`);
+		console.log(`SQLite PRAGMA threads set to ${threads} (blockchain)`);
 	} else {
 		db.exec(`
 PRAGMA journal_mode=WAL;
@@ -85,6 +101,7 @@ function wrap(db: Database): DbHandle {
 		 close() { db.close(); },
 		 beginImmediate() { db.exec("BEGIN IMMEDIATE"); },
 		 commit() { db.exec("COMMIT"); },
+		 rollback() { db.exec("ROLLBACK"); },
 		 prepareInsert() { return db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)"); },
 		 insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>) {
 			const local = stmt ?? db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");

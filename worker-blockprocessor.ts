@@ -13,7 +13,7 @@ let jayson = require("jayson/promise");
 let rpc = url.parse(process.env.BITCOIN_RPC);
 let client = jayson.client.http(rpc);
 const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos_v2.sqlite";
-const dbHandle = openDatabase(dbPath, { pragmasProfile: "bulkload" });
+const dbHandle = openDatabase(dbPath, { pragmasProfile: "blockchain" });
 
 const LAST_PROCESSED_BLOCK = "LAST_PROCESSED_BLOCK";
 let lastProcessedBlock = 0;
@@ -39,6 +39,7 @@ while (1) {
     await processBlock(nextBlockToProcess);
   } catch (error) {
     console.warn("exception when processing block:", error, "continuing as usuall");
+    await new Promise(r => setTimeout(r, 1_000)); // sleep
     if (error.message.includes("socket hang up")) {
       // issue fetching block from bitcoind
       console.warn("retrying block number", nextBlockToProcess);
@@ -50,7 +51,6 @@ while (1) {
   console.log("took", (end - start) / 1000, "sec");
   lastProcessedBlock = nextBlockToProcess;
   fs.writeFileSync(LAST_PROCESSED_BLOCK, lastProcessedBlock.toString());
-  process.exit(0);
 }
 
 
@@ -59,11 +59,22 @@ async function processBlock(blockNum) {
   console.log("processing new block", +blockNum);
   
   dbHandle.beginImmediate();
+  
+  // Prepare all statements once outside the loops for efficiency
   const insertStmt = dbHandle.prepareInsert();
+  const deleteWithScripthashStmt = dbHandle.db.prepare("DELETE FROM utxos WHERE outpoint = ? AND scripthash = ?");
+  const deleteWithoutScripthashStmt = dbHandle.db.prepare("DELETE FROM utxos WHERE outpoint = ?");
+  
   const insertMany = (rows: UtxoRow[]) => {
     dbHandle.insertMany(rows, insertStmt);
   };
   const writeBatch: UtxoRow[] = [];
+  
+  // Collect DELETE operations for batching
+  const deleteBatchWithScripthash: Array<{outpoint: Buffer, scripthash: Buffer}> = [];
+  const deleteBatchWithoutScripthash: Buffer[] = [];
+
+  try {
 
 
   const responseGetblockhash = await client.request("getblockhash", [blockNum]);
@@ -87,17 +98,9 @@ async function processBlock(blockNum) {
       if (vin?.prevout?.scriptPubKey?.hex) {
         // ok we have script so the query will use index
         const scripthash = computeScripthash(Buffer.from(vin.prevout.scriptPubKey.hex, "hex"));
-        dbHandle.db.prepare("DELETE FROM utxos WHERE outpoint = ? AND scripthash = ?").run(outpointBuf, scripthash);
-        const result = dbHandle.db.prepare("DELETE FROM utxos WHERE outpoint = ? AND scripthash = ?").run(outpointBuf, scripthash);
-        // if (result) {
-        //   console.log('spent utxo', result);
-        // }
+        deleteBatchWithScripthash.push({ outpoint: outpointBuf, scripthash });
       } else {
-        const result = dbHandle.db.prepare("DELETE FROM utxos WHERE outpoint = ?").run(outpointBuf);
-        // if (result) {
-        //   console.log(`SELECT * FROM utxos WHERE outpoint = x'${outpointBuf.toString("hex")}'`)
-        //   console.log('spent utxo', result);
-        // }
+        deleteBatchWithoutScripthash.push(outpointBuf);
       }
     }
   
@@ -114,8 +117,33 @@ async function processBlock(blockNum) {
     // if (k++ === 1000) { console.log('tx', JSON.stringify(tx, null, 2)); process.exit(0); }
   }
 
+  // Execute batched DELETE operations
+  console.log('executing', deleteBatchWithScripthash.length + deleteBatchWithoutScripthash.length, 'deletes');
+  for (const { outpoint, scripthash } of deleteBatchWithScripthash) {
+    deleteWithScripthashStmt.run(outpoint, scripthash);
+  }
+  for (const outpoint of deleteBatchWithoutScripthash) {
+    deleteWithoutScripthashStmt.run(outpoint);
+  }
+
   console.log('inserting', writeBatch.length, 'utxos');
   writeBatch.length > 0 && insertMany(writeBatch);
   console.log('commiting to database...');
   dbHandle.commit();
+    
+  } catch (error) {
+    console.error('Error processing block:', error);
+    try {
+      console.log('rolling back');
+      dbHandle.rollback();
+    } catch (rollbackError) {
+      console.error('Error during rollback:', rollbackError);
+    }
+    throw error; // Re-throw to be handled by caller
+  } finally {
+    // Clean up prepared statements
+    deleteWithScripthashStmt.finalize?.();
+    deleteWithoutScripthashStmt.finalize?.();
+    insertStmt.finalize?.();
+  }
 }
