@@ -5,3 +5,11 @@ export function computeScripthash(script: Buffer): Buffer {
 }
 
 
+export function computeOutpoint(txid: string, n: number): Buffer {
+	const indexBuf = Buffer.allocUnsafe(4);
+	indexBuf.writeUInt32LE(n, 0);
+	return Buffer.concat([Buffer.from(txid, "hex"), indexBuf]);
+}
+
+
+

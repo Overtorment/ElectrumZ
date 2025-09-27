@@ -140,7 +140,6 @@ async function main(): Promise<void> {
 
   const handle = openDatabase(outfile, { createSchema: true, pragmasProfile: "bulkload" });
   handle.beginImmediate();
-  // db.exec("CREATE INDEX idx_utxos_scripthash ON utxos(scripthash)");
 
   const reader = new StreamingBinaryReader(infile, { bufferSize: 32 * 1024 * 1024 });
 
