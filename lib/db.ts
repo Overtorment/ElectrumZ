@@ -12,7 +12,7 @@ export interface DbHandle {
 	prepareInsert(): Statement<UtxoRow>;
 	insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>): void;
 	createSchema(): void;
-	ensureScripthashIndex(): void;
+	ensureCompositeIndex(): void;
 }
 
 export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain" }): DbHandle {
@@ -109,7 +109,9 @@ function wrap(db: Database): DbHandle {
 			if (!stmt) local.finalize?.();
 		 },
 		 createSchema() { createSchema(db); },
-		 ensureScripthashIndex() { db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_scripthash ON utxos(scripthash)"); },
+		 ensureCompositeIndex() {
+			 db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_scripthash_outpoint ON utxos(scripthash, outpoint)"); 
+		 },
 	};
 }
 

@@ -11,7 +11,7 @@ Where `outpoint` is 36 bytes: 32-byte prevout hash concatenated with 4-byte litt
 
 import { openDatabase, type UtxoRow } from "./lib/db";
 import { parseArgs } from "util";
-import { existsSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { computeScripthash } from "./lib/scripthash";
 import { StreamingBinaryReader } from "./lib/StreamingBinaryReader";
 
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     const indexBuf = Buffer.allocUnsafe(4);
     indexBuf.writeUInt32LE(prevoutIndex, 0);
     const outpointBuf = Buffer.concat([prevoutHashBuf, indexBuf]);
-    writeBatch.push([outpointBuf, amount, height, scripthash]);
+    (amount >= +(process.env.DUST_LIMIT ?? 1)) && writeBatch.push([outpointBuf, amount, height, scripthash]);
     if (height > maxHeight) maxHeight = height;
     coinsPerHashLeft -= 1;
 
@@ -223,6 +223,7 @@ async function main(): Promise<void> {
   handle.close();
   reader.close();
   console.log(`TOTAL: ${numUtxos} coins written to ${outfile}, snapshot height is ${maxHeight}.`);
+  writeFileSync("LAST_PROCESSED_BLOCK", maxHeight.toString());
 
   if (!(await reader.isAtEnd())) {
     console.log(`WARNING: input file ${infile} has not reached EOF yet!`);

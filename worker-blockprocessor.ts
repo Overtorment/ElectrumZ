@@ -5,14 +5,14 @@ import { openDatabase, UtxoRow } from "./lib/db";
 import { computeOutpoint, computeScripthash } from "./lib/scripthash";
 
 if (!process.env.BITCOIN_RPC) {
-  console.error("not all env variables set");
+  console.log("not all env variables set");
   process.exit();
 }
 
 let jayson = require("jayson/promise");
 let rpc = url.parse(process.env.BITCOIN_RPC);
 let client = jayson.client.http(rpc);
-const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos_v2.sqlite";
+const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos.sqlite";
 const dbHandle = openDatabase(dbPath, { pragmasProfile: "blockchain" });
 
 const LAST_PROCESSED_BLOCK = "LAST_PROCESSED_BLOCK";
@@ -38,17 +38,20 @@ while (1) {
   try {
     await processBlock(nextBlockToProcess);
   } catch (error) {
-    console.warn("exception when processing block:", error, "continuing as usuall");
+    console.warn("exception when processing block:", error.message, " continuing as usuall");
     await new Promise(r => setTimeout(r, 1_000)); // sleep
     if (error.message.includes("socket hang up")) {
       // issue fetching block from bitcoind
       console.warn("retrying block number", nextBlockToProcess);
-      continue; // skip overwriting `LAST_PROCESSED_BLOCK` in `KeyValue` table
     }
+    nextBlockToProcess--;
+    continue; // skip overwriting `LAST_PROCESSED_BLOCK` in `KeyValue` table
   }
+  
 
   const end = +new Date();
   console.log("took", (end - start) / 1000, "sec");
+  console.log("================================");
   lastProcessedBlock = nextBlockToProcess;
   fs.writeFileSync(LAST_PROCESSED_BLOCK, lastProcessedBlock.toString());
 }
@@ -84,6 +87,12 @@ async function processBlock(blockNum) {
   const responseGetblock = await client.request("getblock", [responseGetblockhash.result, 3]);
   
   let k = 0;
+  if (responseGetblock?.error) {
+    // no such block
+    await new Promise(r => setTimeout(r, 3_000));
+    throw new Error("no such block, sleeping");
+  }
+
   for (const tx of responseGetblock.result.tx) {
 
     // finding what utxos are spent and need deletion:
@@ -110,7 +119,7 @@ async function processBlock(blockNum) {
         const scripthash = computeScripthash(Buffer.from(vout.scriptPubKey.hex, "hex"));
         const amount = vout.value * 100_000_000;
         const outpointBuf = computeOutpoint(tx.txid, vout.n);
-        writeBatch.push([outpointBuf, amount, blockNum, scripthash]);
+        (amount >= +(process.env.DUST_LIMIT ?? 1)) && writeBatch.push([outpointBuf, amount, blockNum, scripthash]);
       }
     }
     
@@ -132,7 +141,7 @@ async function processBlock(blockNum) {
   dbHandle.commit();
     
   } catch (error) {
-    console.error('Error processing block:', error);
+    console.error('Error processing block:', error.message);
     try {
       console.log('rolling back');
       dbHandle.rollback();

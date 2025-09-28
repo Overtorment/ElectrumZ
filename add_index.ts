@@ -19,11 +19,11 @@ async function main(): Promise<void> {
   const start = Date.now();
   const handle = openDatabase(dbfile, { pragmasProfile: "indexbuild" });
   handle.beginImmediate();
-  handle.ensureScripthashIndex();
+  handle.ensureCompositeIndex();
   handle.commit();
   handle.close();
   const elapsed = ((Date.now() - start) / 1000).toFixed(3);
-  console.log(`Index 'idx_utxos_scripthash' created on '${dbfile}' in ${elapsed}s.`);
+  console.log(`Composite index 'idx_utxos_scripthash_outpoint' created on '${dbfile}' in ${elapsed}s.`);
 }
 
 if (import.meta.main) {
