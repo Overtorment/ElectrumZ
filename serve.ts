@@ -3,7 +3,7 @@ import { Server } from "jayson/promise";
 import { openDatabase } from "./lib/db";
 
 // Open database once for all requests
-const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos_v2.sqlite";
+const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos.sqlite";
 const dbHandle = openDatabase(dbPath, { pragmasProfile: "readonly" });
 const sumByScripthash = dbHandle.db.prepare("SELECT COALESCE(SUM(value), 0) AS total FROM utxos WHERE scripthash = ?");
 const listUnspentByScripthash = dbHandle.db.prepare("SELECT outpoint, value, height FROM utxos WHERE scripthash = ?");
