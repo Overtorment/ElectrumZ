@@ -10,10 +10,10 @@ Where `outpoint` is 36 bytes: 32-byte prevout hash concatenated with 4-byte litt
 */
 
 import { openDatabase, type UtxoRow } from "./lib/db";
-import { parseArgs } from "util";
 import { existsSync, writeFileSync } from "fs";
 import { computeScripthash } from "./lib/scripthash";
 import { StreamingBinaryReader } from "./lib/StreamingBinaryReader";
+import { DEFAULT_SQLITE_DB_PATH, DEFAULT_UTXO_DUMP_FILE, LAST_PROCESSED_BLOCK_FILE } from "./constants";
 
 const UTXO_DUMP_MAGIC = Buffer.from([0x75, 0x74, 0x78, 0x6f, 0xff]); // 'utxo\xff'
 const UTXO_DUMP_VERSION = 2;
@@ -116,25 +116,15 @@ async function decompressScript(reader: StreamingBinaryReader): Promise<Buffer> 
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs({
-    args: Bun.argv.slice(2),
-    options: { verbose: { type: "boolean", short: "v", default: false } },
-    allowPositionals: true,
-  });
-
-  if (args.positionals.length !== 2) {
-    console.error("Error: Please provide exactly two arguments: <infile> <outfile>");
-    process.exit(1);
-  }
-
-  const [infile, outfile] = args.positionals as [string, string];
+  const infile = DEFAULT_UTXO_DUMP_FILE;
+  const outfile = DEFAULT_SQLITE_DB_PATH;
 
   if (!existsSync(infile)) {
-    console.error(`Error: provided input file '${infile}' doesn't exist.`);
+    console.error(`Error: UTXO dump file '${infile}' doesn't exist.`);
     process.exit(1);
   }
   if (existsSync(outfile)) {
-    console.error(`Error: provided output file '${outfile}' already exists.`);
+    console.error(`Error: SQLite database file '${outfile}' already exists.`);
     process.exit(1);
   }
 
@@ -197,11 +187,11 @@ async function main(): Promise<void> {
     if (height > maxHeight) maxHeight = height;
     coinsPerHashLeft -= 1;
 
-    if (args.values.verbose) {
-      const prevoutHashHex = prevoutHashBuf.toString("hex");
-      console.log(`Coin ${coinIdx}/${numUtxos}:`);
-      console.log(`    prevout = ${prevoutHashHex}:${prevoutIndex}`);
+    if (process.env.VERBOSE) {
+      console.log(`UTXO ${coinIdx}/${numUtxos}:`);
+      console.log(`    prevout = ${prevoutHashBuf.toString("hex")}:${prevoutIndex}`);
       console.log(`    amount = ${amount}, height = ${height}`);
+      console.log(`    script = ${script.toString("hex")}\n`);
       console.log(`    scripthash = ${scripthash.toString("hex")}\n`);
     }
 
@@ -210,23 +200,28 @@ async function main(): Promise<void> {
       writeBatch.length = 0;
     }
 
-    if (coinIdx % (1024 * 1024) === 0) {
+    if (coinIdx % (10 *1024 * 1024) === 0) {
       const elapsed = (Date.now() - startTime) / 1000;
       const progress = coinIdx / numUtxos;
       const etaMinutes = progress > 0 ? (elapsed * (1 - progress) / progress) / 60 : 0;
       console.log(
-        `${coinIdx} coins converted [${(progress * 100).toFixed(2)}%], ${elapsed.toFixed(3)}s passed since start, ETA ${etaMinutes.toFixed(2)} min`
+        `${coinIdx} UTXOs converted [${(progress * 100).toFixed(2)}%], ${elapsed.toFixed(3)}s passed since start, ETA ${etaMinutes.toFixed(2)} min`
       );
     }
   }
   handle.commit();
   handle.close();
   reader.close();
-  console.log(`TOTAL: ${numUtxos} coins written to ${outfile}, snapshot height is ${maxHeight}.`);
-  writeFileSync("LAST_PROCESSED_BLOCK", maxHeight.toString());
+  console.log(`TOTAL: ${numUtxos} UTXOs written to ${outfile}, snapshot height is ${maxHeight}.`);
+  writeFileSync(LAST_PROCESSED_BLOCK_FILE, maxHeight.toString());
 
   if (!(await reader.isAtEnd())) {
     console.log(`WARNING: input file ${infile} has not reached EOF yet!`);
+    process.exit(1);
+  }
+
+  if (writeBatch.length !== 0) {
+    console.log("WARNING: writeBatch is not empty");
     process.exit(1);
   }
 }

@@ -1,6 +1,7 @@
 const url = require("url");
 const fs = require("fs");
 
+import { DEFAULT_SQLITE_DB_PATH, LAST_PROCESSED_BLOCK_FILE } from "./constants";
 import { openDatabase, UtxoRow } from "./lib/db";
 import { computeOutpoint, computeScripthash } from "./lib/scripthash";
 
@@ -12,13 +13,11 @@ if (!process.env.BITCOIN_RPC) {
 let jayson = require("jayson/promise");
 let rpc = url.parse(process.env.BITCOIN_RPC);
 let client = jayson.client.http(rpc);
-const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos.sqlite";
-const dbHandle = openDatabase(dbPath, { pragmasProfile: "blockchain" });
+const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, { pragmasProfile: "blockchain" });
 
-const LAST_PROCESSED_BLOCK = "LAST_PROCESSED_BLOCK";
 let lastProcessedBlock = 0;
 try {
-  lastProcessedBlock = parseInt(fs.readFileSync("LAST_PROCESSED_BLOCK").toString("ascii"));
+  lastProcessedBlock = parseInt(fs.readFileSync(LAST_PROCESSED_BLOCK_FILE).toString("ascii"));
 } catch  {}
 
 if (!(lastProcessedBlock > 0)) {
@@ -26,7 +25,7 @@ if (!(lastProcessedBlock > 0)) {
   const getMaxHeight = dbHandle.db.prepare("select MAX(height) as maxHeight from utxos;");
   const row = getMaxHeight.get() as { maxHeight: number } | null;
   lastProcessedBlock = row?.maxHeight ?? 0;
-  fs.writeFileSync(LAST_PROCESSED_BLOCK, lastProcessedBlock.toString());
+  fs.writeFileSync(LAST_PROCESSED_BLOCK_FILE, lastProcessedBlock.toString());
 }
 
 console.log("Last processed block:", lastProcessedBlock);
@@ -45,7 +44,7 @@ while (1) {
       console.warn("retrying block number", nextBlockToProcess);
     }
     nextBlockToProcess--;
-    continue; // skip overwriting `LAST_PROCESSED_BLOCK` in `KeyValue` table
+    continue; // skip overwriting LAST_PROCESSED_BLOCK_FILE
   }
   
 
@@ -53,12 +52,12 @@ while (1) {
   console.log("took", (end - start) / 1000, "sec");
   console.log("================================");
   lastProcessedBlock = nextBlockToProcess;
-  fs.writeFileSync(LAST_PROCESSED_BLOCK, lastProcessedBlock.toString());
+  fs.writeFileSync(LAST_PROCESSED_BLOCK_FILE, lastProcessedBlock.toString());
 }
 
 
 
-async function processBlock(blockNum) {
+async function processBlock(blockNum: number) {
   console.log("processing new block", +blockNum);
   
   dbHandle.beginImmediate();

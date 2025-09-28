@@ -1,14 +1,13 @@
-// bun add jayson
 import { Server } from "jayson/promise";
 import { openDatabase } from "./lib/db";
+import { DEFAULT_SQLITE_DB_PATH } from "./constants";
 
 // Open database once for all requests
-const dbPath = process.env.UTXOS_DB_PATH ?? "./utxos.sqlite";
-const dbHandle = openDatabase(dbPath, { pragmasProfile: "readonly" });
+const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, { pragmasProfile: "readonly" });
 const sumByScripthash = dbHandle.db.prepare("SELECT COALESCE(SUM(value), 0) AS total FROM utxos WHERE scripthash = ?");
 const listUnspentByScripthash = dbHandle.db.prepare("SELECT outpoint, value, height FROM utxos WHERE scripthash = ?");
 const listHistoryByScripthash = dbHandle.db.prepare("SELECT outpoint, height FROM utxos WHERE scripthash = ?");
-console.log(`[serve] Using database at: ${dbPath}`);
+console.log(`[serve] Using database at: ${DEFAULT_SQLITE_DB_PATH}`);
 
 const server = new Server({
   ping: async () => "pong",
@@ -114,5 +113,5 @@ const server = new Server({
 });
 
 const tcpPort = process.env.TCP_PORT ?? 50011;
-server.tcp().listen(tcpPort); // TCP on :4000
-console.log("jayson TCP listening on " + tcpPort);
+server.tcp().listen(tcpPort);
+console.log("ElectrumZ TCP listening on " + tcpPort);
