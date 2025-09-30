@@ -26,23 +26,23 @@ const NET_MAGIC_BYTES: Record<string, string> = {
 };
 
 
-async function readVarInt(reader: StreamingBinaryReader): Promise<number> {
+function readVarInt(reader: StreamingBinaryReader): number {
   let n = 0;
   while (true) {
-    const dat = await reader.readUInt8();        // 0..255
+    const dat = reader.readUInt8();        // 0..255
     n = n * 128 + (dat & 0x7f);                  // avoid n << 7
     if ((dat & 0x80) !== 0) n += 1; else return n;
   }
 }
 
-async function readCompactSize(reader: StreamingBinaryReader): Promise<number> {
-  let n = await reader.readUInt8();
+function readCompactSize(reader: StreamingBinaryReader): number {
+  let n = reader.readUInt8();
   if (n === 253) {
-    n = await reader.readUInt16LE();
+    n = reader.readUInt16LE();
   } else if (n === 254) {
-    n = await reader.readUInt32LE();
+    n = reader.readUInt32LE();
   } else if (n === 255) {
-    n = Number(await reader.readBigUInt64LE());
+    n = Number(reader.readBigUInt64LE());
   }
   return n;
 }
@@ -93,16 +93,16 @@ function decompressPubkey(compressedPubkey: Buffer): Buffer {
   return Buffer.concat([Buffer.from([4]), xBytes, yBytes]);
 }
 
-async function decompressScript(reader: StreamingBinaryReader): Promise<Buffer> {
-  const size = await readVarInt(reader);
+function decompressScript(reader: StreamingBinaryReader): Buffer {
+  const size = readVarInt(reader);
   if (size === 0) {
-    return Buffer.concat([Buffer.from([0x76, 0xa9, 20]), await reader.read(20), Buffer.from([0x88, 0xac])]);
+    return Buffer.concat([Buffer.from([0x76, 0xa9, 20]), reader.read(20), Buffer.from([0x88, 0xac])]);
   } else if (size === 1) {
-    return Buffer.concat([Buffer.from([0xa9, 20]), await reader.read(20), Buffer.from([0x87])]);
+    return Buffer.concat([Buffer.from([0xa9, 20]), reader.read(20), Buffer.from([0x87])]);
   } else if (size === 2 || size === 3) {
-    return Buffer.concat([Buffer.from([33, size]), await reader.read(32), Buffer.from([0xac])]);
+    return Buffer.concat([Buffer.from([33, size]), reader.read(32), Buffer.from([0xac])]);
   } else if (size === 4 || size === 5) {
-    const compressed = Buffer.concat([Buffer.from([size - 2]), await reader.read(32)]);
+    const compressed = Buffer.concat([Buffer.from([size - 2]), reader.read(32)]);
     return Buffer.concat([Buffer.from([65]), decompressPubkey(compressed), Buffer.from([0xac])]);
   } else {
     const scriptSize = size - 6;
@@ -129,11 +129,11 @@ async function main(): Promise<void> {
 
   const reader = new StreamingBinaryReader(infile, { bufferSize: 32 * 1024 * 1024 });
 
-  const magicBytes = await reader.read(5);
-  const version = await reader.readUInt16LE();
-  const networkMagic = await reader.read(4);
-  const blockHash = await reader.read(32);
-  const numUtxos = Number(await reader.readBigUInt64LE());
+  const magicBytes = reader.read(5);
+  const version = reader.readUInt16LE();
+  const networkMagic = reader.read(4);
+  const blockHash = reader.read(32);
+  const numUtxos = Number(reader.readBigUInt64LE());
 
   if (!magicBytes.equals(UTXO_DUMP_MAGIC)) {
     console.error(`Error: provided input file '${infile}' is not an UTXO dump.`);
@@ -164,16 +164,16 @@ async function main(): Promise<void> {
 
   for (let coinIdx = 1; coinIdx <= numUtxos; coinIdx++) {
     if (coinsPerHashLeft === 0) {
-      const hashBuf = await reader.read(32);
+      const hashBuf = reader.read(32);
       prevoutHashBuf = Buffer.from(hashBuf).reverse();
-      coinsPerHashLeft = await readCompactSize(reader);
+      coinsPerHashLeft = readCompactSize(reader);
     }
-    const prevoutIndex = await readCompactSize(reader);
+    const prevoutIndex = readCompactSize(reader);
 
-    const code = await readVarInt(reader);
+    const code = readVarInt(reader);
     const height = code >> 1;
-    const amount = decompressAmount(await readVarInt(reader));
-    const script = await decompressScript(reader);
+    const amount = decompressAmount(readVarInt(reader));
+    const script = decompressScript(reader);
     const scripthash = computeScripthash(script);
 
     const indexBuf = Buffer.allocUnsafe(4);
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
   console.log(`TOTAL: ${numUtxos} UTXOs written to ${outfile}, snapshot height is ${maxHeight}.`);
   writeFileSync(LAST_PROCESSED_BLOCK_FILE, maxHeight.toString());
 
-  if (!(await reader.isAtEnd())) {
+  if (!(reader.isAtEnd())) {
     console.log(`WARNING: input file ${infile} has not reached EOF yet!`);
     process.exit(1);
   }
