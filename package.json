@@ -1,6 +1,6 @@
 {
   "name": "electrumz",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Minimalistic Electrum server implementation that indexes and serves only chainstate data (aka UTXO)",
   "main": "utxo_to_sqlite.ts",
   "scripts": {
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@noble/hashes": "^2.0.1",
+    "bignumber.js": "^9.3.1",
     "bitcoinjs-lib": "^6.1.7",
     "jayson": "^4.2.0"
   }

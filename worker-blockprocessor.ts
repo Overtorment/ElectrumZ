@@ -1,6 +1,7 @@
 const url = require("url");
 const fs = require("fs");
 
+import { BigNumber } from "bignumber.js";
 import { DEFAULT_SQLITE_DB_PATH, LAST_PROCESSED_BLOCK_FILE } from "./constants";
 import { openDatabase, UtxoRow } from "./lib/db";
 import { computeOutpoint, computeScripthash } from "./lib/scripthash";
@@ -38,7 +39,7 @@ while (1) {
     await processBlock(nextBlockToProcess);
   } catch (error) {
     console.warn("exception when processing block:", error.message, " continuing as usuall");
-    await new Promise(r => setTimeout(r, 1_000)); // sleep
+    await new Promise(r => setTimeout(r, 5_000)); // sleep
     if (error.message.includes("socket hang up")) {
       // issue fetching block from bitcoind
       console.warn("retrying block number", nextBlockToProcess);
@@ -88,7 +89,7 @@ async function processBlock(blockNum: number) {
   let k = 0;
   if (responseGetblock?.error) {
     // no such block
-    await new Promise(r => setTimeout(r, 3_000));
+    await new Promise(r => setTimeout(r, 5_000));
     throw new Error("no such block, sleeping");
   }
 
@@ -116,7 +117,8 @@ async function processBlock(blockNum: number) {
     for (const vout of tx.vout) {
       if (vout.scriptPubKey) {
         const scripthash = computeScripthash(Buffer.from(vout.scriptPubKey.hex, "hex"));
-        const amount = vout.value * 100_000_000;
+        const amount = new BigNumber(vout.value).multipliedBy(100_000_000).toNumber();
+
         const outpointBuf = computeOutpoint(tx.txid, vout.n);
         (amount >= +(process.env.DUST_LIMIT ?? 1)) && writeBatch.push([outpointBuf, amount, blockNum, scripthash]);
       }
@@ -125,8 +127,13 @@ async function processBlock(blockNum: number) {
     // if (k++ === 1000) { console.log('tx', JSON.stringify(tx, null, 2)); process.exit(0); }
   }
 
+  // Execute batched INSERT operations. Inserts must go before deletes, as we might create utxos that will 
+  // be spent _in_the_same_block_, so we need to create them first so deletes can find them lates
+  console.log('inserting', writeBatch.length, 'utxos');
+  writeBatch.length > 0 && insertMany(writeBatch);
+
   // Execute batched DELETE operations
-  console.log('executing', deleteBatchWithScripthash.length + deleteBatchWithoutScripthash.length, 'deletes');
+  console.log('deleting', deleteBatchWithScripthash.length + deleteBatchWithoutScripthash.length, 'utxos');
   for (const { outpoint, scripthash } of deleteBatchWithScripthash) {
     deleteWithScripthashStmt.run(outpoint, scripthash);
   }
@@ -134,8 +141,7 @@ async function processBlock(blockNum: number) {
     deleteWithoutScripthashStmt.run(outpoint);
   }
 
-  console.log('inserting', writeBatch.length, 'utxos');
-  writeBatch.length > 0 && insertMany(writeBatch);
+
   console.log('commiting to database...');
   dbHandle.commit();
     

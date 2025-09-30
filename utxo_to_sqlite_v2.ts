@@ -11,7 +11,7 @@ Where `outpoint` is 36 bytes: 32-byte prevout hash concatenated with 4-byte litt
 
 import { openDatabase, type UtxoRow } from "./lib/db";
 import { existsSync, writeFileSync } from "fs";
-import { computeScripthash } from "./lib/scripthash";
+import { computeOutpointBuf, computeScripthash } from "./lib/scripthash";
 import { StreamingBinaryReader } from "./lib/StreamingBinaryReader";
 import { DEFAULT_SQLITE_DB_PATH, DEFAULT_UTXO_DUMP_FILE, LAST_PROCESSED_BLOCK_FILE } from "./constants";
 
@@ -29,13 +29,9 @@ const NET_MAGIC_BYTES: Record<string, string> = {
 async function readVarInt(reader: StreamingBinaryReader): Promise<number> {
   let n = 0;
   while (true) {
-    const dat = await reader.readUInt8();
-    n = (n << 7) | (dat & 0x7f);
-    if ((dat & 0x80) > 0) {
-      n += 1;
-    } else {
-      return n;
-    }
+    const dat = await reader.readUInt8();        // 0..255
+    n = n * 128 + (dat & 0x7f);                  // avoid n << 7
+    if ((dat & 0x80) !== 0) n += 1; else return n;
   }
 }
 

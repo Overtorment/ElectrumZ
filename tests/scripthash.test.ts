@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { computeScripthash } from "../lib/scripthash";
+import { computeOutpoint, computeOutpointBuf, computeScripthash } from "../lib/scripthash";
 
 function hex(hexString: string): Buffer {
   return Buffer.from(hexString.replace(/^0x/, ""), "hex");
@@ -45,6 +45,33 @@ describe("computeScripthash", () => {
     expect(Buffer.isBuffer(scripthash)).toBe(true);
     expect(scripthash.length).toBe(32);
     expect(scripthash.toString("hex")).toBe("3babce0e0ce27d2dea6a599bef2aed2a2b25c0f1aa0998afa948a353a1713b1d");
+  });
+});
+
+
+describe('computeOutpoint', () => {
+  test('should compute outpoint correctly', () => {
+    const outpoint = computeOutpoint("f1373cfda16afb180c9f0c7c8783bb61febc98e3de3a82c9b77234b33a997b5d", 1);
+    expect(outpoint.toString("hex")).toBe("f1373cfda16afb180c9f0c7c8783bb61febc98e3de3a82c9b77234b33a997b5d01000000");
+  });
+  test('should compute outpoint correctly', () => {
+    const outpoint = computeOutpoint("a0a65298bd173cb6973dbbe883aaa7665daac8ca394efe5ea424d89f3732abaf", 4);
+    expect(outpoint.toString("hex")).toBe("a0a65298bd173cb6973dbbe883aaa7665daac8ca394efe5ea424d89f3732abaf04000000");
+  });
+});
+
+
+
+describe('computeOutpointBuf', () => {
+
+  test('should compute outpoint correctly', () => {
+    const outpoint = computeOutpointBuf(Buffer.from("f1373cfda16afb180c9f0c7c8783bb61febc98e3de3a82c9b77234b33a997b5d", "hex"), 1);
+    expect(outpoint.toString("hex")).toBe("f1373cfda16afb180c9f0c7c8783bb61febc98e3de3a82c9b77234b33a997b5d01000000");
+  });
+
+  test('should compute outpoint correctly', () => {
+    const outpoint = computeOutpointBuf(Buffer.from("a0a65298bd173cb6973dbbe883aaa7665daac8ca394efe5ea424d89f3732abaf", "hex"), 4);
+    expect(outpoint.toString("hex")).toBe("a0a65298bd173cb6973dbbe883aaa7665daac8ca394efe5ea424d89f3732abaf04000000");
   });
 });
 
