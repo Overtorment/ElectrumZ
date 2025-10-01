@@ -1,6 +1,7 @@
 import { Server } from "jayson/promise";
 import { openDatabase } from "./lib/db";
 import { DEFAULT_SQLITE_DB_PATH } from "./constants";
+const pckg = require("./package.json");
 
 // Open database once for all requests
 const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, { pragmasProfile: "readonly" });
@@ -10,6 +11,53 @@ const listHistoryByScripthash = dbHandle.db.prepare("SELECT outpoint, height FRO
 console.log(`[serve] Using database at: ${DEFAULT_SQLITE_DB_PATH}`);
 
 const server = new Server({
+  "server.version": async (params: unknown) => [`${pckg.name} ${pckg.version}`, '1.1'], // we should close the connection if protocol ver mismatch
+  "server.ping": async (params: unknown) => null,
+  "server.peers.subscribe": async (params: unknown) => [],
+  "server.features": async (params: unknown) => ({
+         "genesis_hash": "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943",
+        "hosts": {},
+        "protocol_max": "1.0",
+        "protocol_min": "1.0",
+        "pruning": null,
+        "server_version": `${pckg.name} ${pckg.version}`,
+        "hash_function": "sha256"
+  }),
+  "server.donation_address": async () => '13HaCAB4jf7FYSZexJxoczyDDnutzZigjS',
+  "server.banner": async () => 'Воруй! Убивай! Еби гусей!',
+  "server.add_peer": async () => false,
+  "mempool.get_fee_histogram": async () => [],
+  "blockchain.transaction.id_from_pos": async () => false, // kurwa
+  "blockchain.transaction.get_merkle": async () => false, // kurwa
+  "blockchain.transaction.get": async (params: [string, boolean]) => {
+    // TODO: proxy to bitcoind
+    if (params[1]) {
+      return {"helo": "world"};
+    } else {
+      return "ffffffff";
+    }
+  },
+  "blockchain.transaction.broadcast": async (params: [string]) => {
+    // TODO: proxy to bitcoind
+    return "a76242fce5753b4212f903ff33ac6fe66f2780f34bdb4b33b175a7815a11a98e";
+  },
+  "blockchain.scripthash.subscribe": async () => false, // nop; TODO: lookup correct response signature
+  "blockchain.scripthash.unsubscribe": async () => false,
+  "blockchain.scripthash.get_mempool": async () => [],
+  "blockchain.relayfee": async () => 0,
+  "blockchain.block.header": async () => false,
+  "blockchain.block.headers": async () => ({
+    // TODO
+    "count": 2,
+    "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299",
+    "max": 2016
+  }),
+  "blockchain.headers.subscribe": async () => ({
+    // TODO: max height & block header
+    "height": 520481,
+    "hex": "00000020890208a0ae3a3892aa047c5468725846577cfcd9b512b50000000000000000005dc2b02f2d297a9064ee103036c14d678f9afc7e3d9409cf53fd58b82e938e8ecbeca05a2d2103188ce804c4"
+  }),
+  "blockchain.estimatefee": async () => 0,
   ping: async () => "pong",
   add: async ([a, b]: [number, number]) => a + b,
   "blockchain.scripthash.get_balance": async (params: unknown) => {

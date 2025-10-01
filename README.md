@@ -39,7 +39,7 @@ How it works:
 TODO
 ----
 
-* [ ] add worker to catch up after initial data ingestion (delete spent utxos, add new utxos)
+* [x] add worker to catch up after initial data ingestion (delete spent utxos, add new utxos)
 * [ ] implement missing less-important JSON-RPC methods
 * [ ] add TLS & Websocket servers
 * [ ] handle reorgs

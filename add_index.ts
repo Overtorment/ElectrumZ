@@ -12,6 +12,7 @@ async function main(): Promise<void> {
   const start = Date.now();
   const handle = openDatabase(DEFAULT_SQLITE_DB_PATH, { pragmasProfile: "indexbuild" });
   handle.beginImmediate();
+  console.log('adding index...');
   handle.ensureCompositeIndex();
   handle.commit();
   handle.close();
