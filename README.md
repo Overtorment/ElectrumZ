@@ -40,7 +40,7 @@ TODO
 ----
 
 * [x] add worker to catch up after initial data ingestion (delete spent utxos, add new utxos)
-* [ ] implement missing less-important JSON-RPC methods
+* [x] implement missing less-important JSON-RPC methods
 * [ ] add TLS & Websocket servers
 * [ ] handle reorgs
 
@@ -50,3 +50,4 @@ For reference
 
 * https://electrum-protocol.readthedocs.io/en/latest/protocol-methods.html
 * https://github.com/bitcoin/bitcoin/blob/master/contrib/utxo-tools/utxo_to_sqlite.py
+* https://research.mempool.space/utxo-set-report/

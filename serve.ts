@@ -15,12 +15,13 @@ const server = new Server({
   "server.ping": async (params: unknown) => null,
   "server.peers.subscribe": async (params: unknown) => [],
   "server.features": async (params: unknown) => ({
-         "genesis_hash": "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943",
+        "genesis_hash": "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
         "hosts": {},
-        "protocol_max": "1.0",
-        "protocol_min": "1.0",
-        "pruning": null,
+        "protocol_max": "1.4.3",
+        "protocol_min": "1.2",
+        "pruning": null, // TODO: can we detect pruning bitcoind?
         "server_version": `${pckg.name} ${pckg.version}`,
+        "services": [],
         "hash_function": "sha256"
   }),
   "server.donation_address": async () => '13HaCAB4jf7FYSZexJxoczyDDnutzZigjS',
@@ -41,19 +42,21 @@ const server = new Server({
     // TODO: proxy to bitcoind
     return "a76242fce5753b4212f903ff33ac6fe66f2780f34bdb4b33b175a7815a11a98e";
   },
-  "blockchain.scripthash.subscribe": async () => false, // nop; TODO: lookup correct response signature
+  "blockchain.scripthash.subscribe": async () => null,
   "blockchain.scripthash.unsubscribe": async () => false,
   "blockchain.scripthash.get_mempool": async () => [],
   "blockchain.relayfee": async () => 0,
   "blockchain.block.header": async () => false,
   "blockchain.block.headers": async () => ({
     // TODO
+    // dummy data:
     "count": 2,
     "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299",
     "max": 2016
   }),
   "blockchain.headers.subscribe": async () => ({
     // TODO: max height & block header
+    // dummy data:
     "height": 520481,
     "hex": "00000020890208a0ae3a3892aa047c5468725846577cfcd9b512b50000000000000000005dc2b02f2d297a9064ee103036c14d678f9afc7e3d9409cf53fd58b82e938e8ecbeca05a2d2103188ce804c4"
   }),
