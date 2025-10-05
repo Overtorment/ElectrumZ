@@ -1,16 +1,17 @@
 {
   "name": "electrumz",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Minimalistic Electrum server implementation that indexes and serves only chainstate data (aka UTXO)",
-  "main": "utxo_to_sqlite.ts",
+  "main": "electrumz.ts",
   "scripts": {
-    "start": "bun run utxo_to_sqlite.ts",
-    "dev": "bun --watch run utxo_to_sqlite.ts"
+    "start": "bun run electrumz.ts",
+    "test": "bun test"
   },
   "keywords": [
     "bitcoin",
     "utxo",
     "sqlite",
+    "electrum",
     "blockchain"
   ],
   "author": "overtorment <overtorment@gmail.com>",
