@@ -68,7 +68,6 @@ const server = new Server({
       let hex: string | undefined;
       if (typeof params === "string") hex = params;
       else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-      console.log(`[get_balance] params=`, params);
 
       if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
         console.warn(`[get_balance] invalid hex param:`, hex);
@@ -78,7 +77,6 @@ const server = new Server({
       const key = Buffer.from(hex, "hex");
       const row = sumByScripthash.get(key) as { total: number } | null;
       const confirmed = row?.total ?? 0;
-      console.log(`[get_balance] scripthash=${hex}, confirmed=${confirmed}`);
       return { confirmed, unconfirmed: 0 };
     } catch (e) {
       console.error(`[get_balance] error:`, e);
@@ -90,7 +88,6 @@ const server = new Server({
       let hex: string | undefined;
       if (typeof params === "string") hex = params;
       else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-      console.log(`[get_history] params=`, params);
 
       if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
         console.warn(`[get_history] invalid hex param:`, hex);
@@ -107,7 +104,6 @@ const server = new Server({
         const txHashHex = outBuf.subarray(0, 32).toString("hex");
         return { height: r.height, tx_hash: txHashHex };
       });
-      console.log(`[get_history] scripthash=${hex}, items=${result.length}`);
       return result;
     } catch (e) {
       console.error(`[get_history] error:`, e);
@@ -119,7 +115,6 @@ const server = new Server({
       let hex: string | undefined;
       if (typeof params === "string") hex = params;
       else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-      console.log(`[listunspent] params=`, params);
 
       if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
         console.warn(`[listunspent] invalid hex param:`, hex);
@@ -137,7 +132,6 @@ const server = new Server({
         const txPos = outBuf.length >= 36 ? outBuf.readUInt32LE(32) : 0;
         return { height: r.height, tx_pos: txPos, tx_hash: txHashHex, value: r.value };
       });
-      console.log(`[listunspent] scripthash=${hex}, items=${result.length}`);
       return result;
     } catch (e) {
       console.error(`[listunspent] error:`, e);
@@ -159,6 +153,13 @@ const server = new Server({
       // @ts-ignore
       (value as any).jsonrpc = "2.0";
     }
+
+    if (typeof (value as any).method === "string") {
+      // logging:
+      console.log(`${(value as any).method}   params=${JSON.stringify((value as any).params)}`);
+    }
+
+
     return value as any;
   },
 });
