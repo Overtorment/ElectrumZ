@@ -92,7 +92,7 @@ PRAGMA foreign_keys=ON;
 }
 
 function createSchema(db: Database): void {
-	db.exec("CREATE TABLE utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)");
+	db.exec("CREATE TABLE IF NOT EXISTS utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)");
 }
 
 function wrap(db: Database): DbHandle {

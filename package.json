@@ -1,6 +1,6 @@
 {
   "name": "electrumz",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Minimalistic Electrum server implementation that indexes and serves only chainstate data (aka UTXO)",
   "main": "electrumz.ts",
   "scripts": {

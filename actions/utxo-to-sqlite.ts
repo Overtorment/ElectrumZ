@@ -129,6 +129,7 @@ export async function utxoToSqlite(): Promise<void> {
     process.exit(1);
   }
 
+  console.log('parsing UTXO dump into SQLite database...');
   const networkString = NET_MAGIC_BYTES[networkMagic.toString("hex")] ?? `unknown network (${networkMagic.toString("hex")})`;
   console.log(
     `UTXO Snapshot for ${networkString} at block hash ${Buffer.from(blockHash).reverse().toString("hex")}, contains ${numUtxos} utxos`

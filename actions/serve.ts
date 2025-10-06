@@ -67,16 +67,7 @@ export async function serve(): Promise<void> {
     add: async ([a, b]: [number, number]) => a + b,
     "blockchain.scripthash.get_balance": async (params: unknown) => {
       try {
-        let hex: string | undefined;
-        if (typeof params === "string") hex = params;
-        else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-
-        if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
-          console.warn(`[get_balance] invalid hex param:`, hex);
-          return {confirmed: 0, unconfirmed: 0};
-        }
-
-        const key = Buffer.from(hex, "hex");
+        const key = Buffer.from(params[0], "hex");
         const row = sumByScripthash.get(key) as { total: number } | null;
         const confirmed = row?.total ?? 0;
         return {confirmed, unconfirmed: 0};
@@ -87,22 +78,10 @@ export async function serve(): Promise<void> {
     },
     "blockchain.scripthash.get_history": async (params: unknown) => {
       try {
-        let hex: string | undefined;
-        if (typeof params === "string") hex = params;
-        else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-
-        if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
-          console.warn(`[get_history] invalid hex param:`, hex);
-          return [] as Array<{ height: number; tx_hash: string }>;
-        }
-
-        const key = Buffer.from(hex, "hex");
+        const key = Buffer.from(params[0], "hex");
         const rows = listHistoryByScripthash.all(key) as Array<{ outpoint: any; height: number }>;
         const result = rows.map((r, idx) => {
           const outBuf = Buffer.isBuffer(r.outpoint) ? (r.outpoint as Buffer) : Buffer.from(r.outpoint);
-          if (outBuf.length !== 36) {
-            console.warn(`[get_history] unexpected outpoint length at row ${idx}:`, outBuf.length);
-          }
           const txHashHex = outBuf.subarray(0, 32).toString("hex");
           return {height: r.height, tx_hash: txHashHex};
         });
@@ -114,22 +93,10 @@ export async function serve(): Promise<void> {
     },
     "blockchain.scripthash.listunspent": async (params: unknown) => {
       try {
-        let hex: string | undefined;
-        if (typeof params === "string") hex = params;
-        else if (Array.isArray(params) && typeof params[0] === "string") hex = params[0] as string;
-
-        if (!hex || typeof hex !== "string" || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
-          console.warn(`[listunspent] invalid hex param:`, hex);
-          return [] as Array<{ height: number; tx_pos: number; tx_hash: string; value: number }>;
-        }
-
-        const key = Buffer.from(hex, "hex");
+        const key = Buffer.from(params[0], "hex");
         const rows = listUnspentByScripthash.all(key) as Array<{ outpoint: any; value: number; height: number }>;
         const result = rows.map((r, idx) => {
           const outBuf = Buffer.isBuffer(r.outpoint) ? (r.outpoint as Buffer) : Buffer.from(r.outpoint);
-          if (outBuf.length !== 36) {
-            console.warn(`[listunspent] unexpected outpoint length at row ${idx}:`, outBuf.length);
-          }
           const txHashHex = outBuf.subarray(0, 32).toString("hex");
           const txPos = outBuf.length >= 36 ? outBuf.readUInt32LE(32) : 0;
           return {height: r.height, tx_pos: txPos, tx_hash: txHashHex, value: r.value};

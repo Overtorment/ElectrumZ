@@ -43,7 +43,7 @@ export async function workerBlockprocessor(): Promise<void> {
       await processBlock(nextBlockToProcess);
     } catch (error) {
       console.warn("exception when processing block: " + error.message + "; continuing as usual");
-      await new Promise(r => setTimeout(r, 5_000)); // sleep
+      await new Promise(r => setTimeout(r, 15_000)); // sleep
       if (error.message.includes("socket hang up")) {
         // issue fetching block from bitcoind
         console.warn("retrying block number", nextBlockToProcess);

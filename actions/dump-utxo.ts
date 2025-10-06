@@ -10,15 +10,22 @@ export async function dumpUtxo(): Promise<void> {
         process.exit();
     }
 
+    console.log(`Dumping UTXO...`);
     const start = Date.now();
 
     let jayson = require("jayson/promise");
     let rpc = url.parse(process.env.BITCOIN_RPC);
     let client = jayson.client.http(rpc);
 
+    try {
     const getblockchaininfo = await client.request("getblockchaininfo", []);
     if (getblockchaininfo?.result?.chain !== 'main') {
-        process.exit('cant reach bitcoind');
+        console.log('bitcoind not ready:', getblockchaininfo);
+        process.exit(1);
+    }
+    } catch (error: any) {
+        console.log('cant reach bitcoind:', error.message);
+        process.exit(1);
     }
 
     const absolutePath = path.resolve(DEFAULT_UTXO_DUMP_FILE);
