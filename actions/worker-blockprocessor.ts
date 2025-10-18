@@ -148,6 +148,8 @@ export async function workerBlockprocessor(): Promise<void> {
       console.log('commiting to database...');
       dbHandle.commit();
 
+      // Checkpoint WAL after commit to prevent unbounded WAL growth
+      dbHandle.checkpoint("TRUNCATE");
     } catch (error) {
       console.error('Error processing block:', error.message);
       try {

@@ -13,6 +13,7 @@ export interface DbHandle {
 	insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>): void;
 	createSchema(): void;
 	ensureCompositeIndex(): void;
+	checkpoint(mode?: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE"): void;
 }
 
 export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain" }): DbHandle {
@@ -51,7 +52,7 @@ PRAGMA mmap_size=1073741824;
 PRAGMA threads=${threads};
 PRAGMA automatic_index=ON;
 PRAGMA foreign_keys=OFF;
-PRAGMA busy_timeout=1000;
+PRAGMA busy_timeout=29000;
 `);
 		console.log(`SQLite PRAGMA threads set to ${threads} (readonly)`);
 	} else if (profile === "indexbuild") {
@@ -64,7 +65,7 @@ PRAGMA cache_size=-262144;
 PRAGMA mmap_size=0;
 PRAGMA threads=${threads};
 PRAGMA foreign_keys=OFF;
-PRAGMA busy_timeout=10000;
+PRAGMA busy_timeout=29000;
 `);
 		console.log(`SQLite PRAGMA threads set to ${threads} (indexbuild)`);
 	} else if (profile === "blockchain") {
@@ -78,7 +79,7 @@ PRAGMA page_size=32768;
 PRAGMA mmap_size=1073741824;
 PRAGMA threads=${threads};
 PRAGMA foreign_keys=OFF;
-PRAGMA busy_timeout=5000;
+PRAGMA busy_timeout=29000;
 PRAGMA optimize;
 `);
 		console.log(`SQLite PRAGMA threads set to ${threads} (blockchain)`);
@@ -111,6 +112,9 @@ function wrap(db: Database): DbHandle {
 		 createSchema() { createSchema(db); },
 		 ensureCompositeIndex() {
 			 db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_scripthash_outpoint ON utxos(scripthash, outpoint)"); 
+		 },
+		 checkpoint(mode: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE" = "TRUNCATE") {
+			 db.exec(`PRAGMA wal_checkpoint(${mode})`);
 		 },
 	};
 }
