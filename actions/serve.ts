@@ -143,15 +143,21 @@ export async function serve(): Promise<void> {
     const originalEnd = socket.end.bind(socket);
     
     socket.write = function(data: any, ...args: any[]) {
-      if (typeof data === 'string' && data.trim().startsWith('{')) {
-        return originalWrite(data + '\n', ...args);
+      if (typeof data === 'string') {
+        const trimmed = data.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          return originalWrite(data + '\n', ...args);
+        }
       }
       return originalWrite(data, ...args);
     };
     
     socket.end = function(data: any, ...args: any[]) {
-      if (data && typeof data === 'string' && data.trim().startsWith('{')) {
-        return originalEnd(data + '\n', ...args);
+      if (data && typeof data === 'string') {
+        const trimmed = data.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          return originalEnd(data + '\n', ...args);
+        }
       }
       return originalEnd(data, ...args);
     };

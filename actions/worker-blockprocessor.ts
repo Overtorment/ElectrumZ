@@ -35,7 +35,6 @@ export async function workerBlockprocessor(): Promise<void> {
 
   console.log("Last processed block:", lastProcessedBlock);
 
-
   while (1) {
     let nextBlockToProcess: number = lastProcessedBlock + 1;
     const start = +new Date();
