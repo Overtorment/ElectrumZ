@@ -137,8 +137,30 @@ export async function serve(): Promise<void> {
   const tcpPort = process.env.TCP_PORT ?? 50011;
   const tlsPort = process.env.TLS_PORT ?? 50012;
   
-  // Start TCP server
-  server.tcp().listen(tcpPort);
+  // Wrap socket methods to append newline to all writes
+  const wrapSocket = (socket: any) => {
+    const originalWrite = socket.write.bind(socket);
+    const originalEnd = socket.end.bind(socket);
+    
+    socket.write = function(data: any, ...args: any[]) {
+      if (typeof data === 'string' && data.trim().startsWith('{')) {
+        return originalWrite(data + '\n', ...args);
+      }
+      return originalWrite(data, ...args);
+    };
+    
+    socket.end = function(data: any, ...args: any[]) {
+      if (data && typeof data === 'string' && data.trim().startsWith('{')) {
+        return originalEnd(data + '\n', ...args);
+      }
+      return originalEnd(data, ...args);
+    };
+  };
+  
+  // Start TCP server with socket wrapping
+  const tcpServer = server.tcp();
+  tcpServer.on('connection', wrapSocket);
+  tcpServer.listen(tcpPort);
   console.log("ElectrumZ TCP listening on " + tcpPort);
 
  
@@ -152,7 +174,10 @@ export async function serve(): Promise<void> {
         cert: readFileSync(String(process.env.TLS_CERT_PATH)),
         key: readFileSync(String(process.env.TLS_KEY_PATH))
       };
-      server.tls(tlsOptions).listen(tlsPort);
+      
+      const tlsServer = server.tls(tlsOptions);
+      tlsServer.on('secureConnection', wrapSocket);
+      tlsServer.listen(tlsPort);
       console.log("ElectrumZ TLS listening on " + tlsPort);
       console.log(`Using TLS certificate: ${process.env.TLS_CERT_PATH}`);
       console.log(`Using TLS private key: ${process.env.TLS_KEY_PATH}`);
