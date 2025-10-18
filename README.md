@@ -5,13 +5,13 @@ Minimalistic Electrum server implementation that indexes and serves only chainst
 
 Pros:
 
-* takes way less disk space, ~20 Gb
-* fast to index: all done in less than an hour
+* takes way less disk space, ~15 Gb (with dust limit set to 1k sat)
+* fast to index: all done in 30 minutes
 * works: you can see your balance, and get data to construct spending transactions
 
 Cons:
 
-* cant serve historic data: will show only your recent transactions (the ones that have unspent outputs to you)
+* cant serve historic data: will show only your recent transactions (the ones that have unspent outputs)
 * because of the above, cant be used to import seeds in wallets from scratch: not all funds might be detected (might need huge gap_limit)
 * doesnt work with mempool, so cant tell anything about unconfirmed transactions or do fee estimation based on mempool
 * must be initially synced on the same machine where Bitcoin Core is (to access utxo dump)

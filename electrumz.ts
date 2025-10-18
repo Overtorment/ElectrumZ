@@ -67,6 +67,10 @@ if (appState === EAppState.CONVERTED_DUMP_TO_SQLITE) {
     // add indexes, start serving, launch block processing worker
     await addIndexes();
     appState = EAppState.ADDED_INDEX;
+    if (fs.existsSync(DEFAULT_UTXO_DUMP_FILE)) {
+        fs.unlinkSync(DEFAULT_UTXO_DUMP_FILE);
+        console.log(`Deleted ${DEFAULT_UTXO_DUMP_FILE}`);
+    }
     await Promise.all([serve(), workerBlockprocessor()]);
 }
 

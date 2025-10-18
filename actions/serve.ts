@@ -1,4 +1,5 @@
 import { Server } from "jayson/promise";
+import { readFileSync, existsSync } from 'node:fs';
 import { openDatabase } from "../lib/db";
 import { DEFAULT_SQLITE_DB_PATH } from "../constants";
 const pckg = require("../package.json");
@@ -134,8 +135,32 @@ export async function serve(): Promise<void> {
   });
 
   const tcpPort = process.env.TCP_PORT ?? 50011;
+  const tlsPort = process.env.TLS_PORT ?? 50012;
+  
+  // Start TCP server
   server.tcp().listen(tcpPort);
   console.log("ElectrumZ TCP listening on " + tcpPort);
+
+ 
+  // Start TLS server only if env vars are set and files exist
+  const certExists = existsSync(String(process.env.TLS_CERT_PATH));
+  const keyExists = existsSync(String(process.env.TLS_KEY_PATH));
+  
+  if (certExists && keyExists) {
+    try {
+      const tlsOptions = {
+        cert: readFileSync(String(process.env.TLS_CERT_PATH)),
+        key: readFileSync(String(process.env.TLS_KEY_PATH))
+      };
+      server.tls(tlsOptions).listen(tlsPort);
+      console.log("ElectrumZ TLS listening on " + tlsPort);
+      console.log(`Using TLS certificate: ${process.env.TLS_CERT_PATH}`);
+      console.log(`Using TLS private key: ${process.env.TLS_KEY_PATH}`);
+    } catch (error) {
+      console.error("Failed to start TLS server:", error);
+      console.error("Please check that the certificate and key files are valid.");
+    }
+  }
 }
 
 
