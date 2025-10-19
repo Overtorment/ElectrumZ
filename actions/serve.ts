@@ -1,4 +1,6 @@
 import { Server } from "jayson/promise";
+import { Cache } from "../lib/cache";
+const url = require("url");
 import { readFileSync, existsSync } from 'node:fs';
 import { openDatabase } from "../lib/db";
 import { DEFAULT_SQLITE_DB_PATH } from "../constants";
@@ -6,7 +8,22 @@ const pckg = require("../package.json");
 
 
 export async function serve(): Promise<void> {
-// Open database once for all requests
+  if (!process.env.BITCOIN_RPC) {
+    console.log("not all env variables set");
+    process.exit();
+  }
+
+  let jayson = require("jayson/promise");
+  let rpc = url.parse(process.env.BITCOIN_RPC);
+  let rpcClient = jayson.client.http(rpc);
+
+  const responseGetIndexInfo = await rpcClient.request("getindexinfo", []);
+  const txindexEnabled = !!(responseGetIndexInfo?.result?.txindex?.synced === true);
+  console.log(`Bitcoin txindex enabled: ${txindexEnabled}`);
+
+  const txcache = new Cache<string, object>(9999);
+
+  // Open database once for all requests
   const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, {pragmasProfile: "readonly"});
   const sumByScripthash = dbHandle.db.prepare("SELECT COALESCE(SUM(value), 0) AS total FROM utxos WHERE scripthash = ?");
   const listUnspentByScripthash = dbHandle.db.prepare("SELECT outpoint, value, height FROM utxos WHERE scripthash = ?");
@@ -34,16 +51,24 @@ export async function serve(): Promise<void> {
     "blockchain.transaction.id_from_pos": async () => false, // kurwa
     "blockchain.transaction.get_merkle": async () => false, // kurwa
     "blockchain.transaction.get": async (params: [string, boolean]) => {
-      // TODO: proxy to bitcoind
-      if (params[1]) {
-        return {"helo": "world"};
-      } else {
-        return "ffffffff";
+      if (!txindexEnabled) {
+        return {vin:[], vout:[], txid: params[0], hash: ''};
       }
+
+      // Try cache first
+      const cached = txcache.get(params[0]);
+      if (cached) return cached; // hit
+
+      const response = await rpcClient.request("getrawtransaction", [params[0], 1]);
+      if (response.error) {
+        throw server.error(501, `[getrawtransaction] error: ` + response.error.message);
+      }
+      txcache.set(params[0], response.result);
+      return response.result;
     },
     "blockchain.transaction.broadcast": async (params: [string]) => {
-      // TODO: proxy to bitcoind
-      return "a76242fce5753b4212f903ff33ac6fe66f2780f34bdb4b33b175a7815a11a98e";
+      const response = await rpcClient.request("sendrawtransaction", [params[0]]);
+      return response.result;
     },
     "blockchain.scripthash.subscribe": async () => null,
     "blockchain.scripthash.unsubscribe": async () => false,
@@ -66,7 +91,7 @@ export async function serve(): Promise<void> {
     "blockchain.estimatefee": async () => 0,
     ping: async () => "pong",
     add: async ([a, b]: [number, number]) => a + b,
-    "blockchain.scripthash.get_balance": async (params: unknown) => {
+    "blockchain.scripthash.get_balance": async (params: string[]) => {
       try {
         const key = Buffer.from(params[0], "hex");
         const row = sumByScripthash.get(key) as { total: number } | null;
@@ -77,7 +102,7 @@ export async function serve(): Promise<void> {
         throw server.error(501, `[get_balance] error: ` + e.message);
       }
     },
-    "blockchain.scripthash.get_history": async (params: unknown) => {
+    "blockchain.scripthash.get_history": async (params: string[]) => {
       try {
         const key = Buffer.from(params[0], "hex");
         const rows = listHistoryByScripthash.all(key) as Array<{ outpoint: any; height: number }>;
@@ -92,7 +117,7 @@ export async function serve(): Promise<void> {
         throw server.error(501, `[get_history] error: ` + e.message);
       }
     },
-    "blockchain.scripthash.listunspent": async (params: unknown) => {
+    "blockchain.scripthash.listunspent": async (params: string[]) => {
       try {
         const key = Buffer.from(params[0], "hex");
         const rows = listUnspentByScripthash.all(key) as Array<{ outpoint: any; value: number; height: number }>;
