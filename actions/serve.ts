@@ -51,19 +51,24 @@ export async function serve(): Promise<void> {
     "blockchain.transaction.id_from_pos": async () => false, // kurwa
     "blockchain.transaction.get_merkle": async () => false, // kurwa
     "blockchain.transaction.get": async (params: [string, boolean]) => {
-      if (!txindexEnabled) {
+      if (!txindexEnabled && params[1]) {
         return {vin:[], vout:[], txid: params[0], hash: ''};
       }
 
+      if (!txindexEnabled && !params[1]) {
+        return '';
+      }
+
       // Try cache first
-      const cached = txcache.get(params[0]);
+      const cacheKey = params[0] + String(!!params[1]);
+      const cached = txcache.get(cacheKey);
       if (cached) return cached; // hit
 
-      const response = await rpcClient.request("getrawtransaction", [params[0], 1]);
+      const response = await rpcClient.request("getrawtransaction", [params[0], !!params[1]]);
       if (response.error) {
         throw server.error(501, `[getrawtransaction] error: ` + response.error.message);
       }
-      txcache.set(params[0], response.result);
+      txcache.set(cacheKey, response.result);
       return response.result;
     },
     "blockchain.transaction.broadcast": async (params: [string]) => {
@@ -88,7 +93,7 @@ export async function serve(): Promise<void> {
       "height": 520481,
       "hex": "00000020890208a0ae3a3892aa047c5468725846577cfcd9b512b50000000000000000005dc2b02f2d297a9064ee103036c14d678f9afc7e3d9409cf53fd58b82e938e8ecbeca05a2d2103188ce804c4"
     }),
-    "blockchain.estimatefee": async () => 0,
+    "blockchain.estimatefee": async () => -1,
     ping: async () => "pong",
     add: async ([a, b]: [number, number]) => a + b,
     "blockchain.scripthash.get_balance": async (params: string[]) => {
