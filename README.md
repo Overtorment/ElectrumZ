@@ -36,12 +36,32 @@ How it works:
 1. Ready to serve!
 1. Launch worker that watches for new blocks and updates UTXOs in sqlite database
 
+TLS Configuration
+-----------------
+
+The server supports TLS encryption for secure connections. TLS is enabled only when both environment variables are set to existing files:
+
+```bash
+export TLS_CERT_PATH=/path/to/your/cert.pem
+export TLS_KEY_PATH=/path/to/your/key.pem
+```
+
+### Server Ports
+
+The server runs on two ports by default:
+* TCP: 50011 (configurable via `TCP_PORT` environment variable)
+* TLS: 50012 (configurable via `TLS_PORT` environment variable)
+
+If the env vars are not set or files are missing, only the TCP server will start.
+
 TODO
 ----
 
 * [x] add worker to catch up after initial data ingestion (delete spent utxos, add new utxos)
 * [x] implement missing less-important JSON-RPC methods
-* [ ] add TLS & Websocket servers
+* [x] add TLS server with certificate configuration
+* [ ] add Websocket servers
+* [ ] add worker to process mempool
 * [ ] handle reorgs
 
 

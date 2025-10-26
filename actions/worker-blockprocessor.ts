@@ -16,7 +16,10 @@ export async function workerBlockprocessor(): Promise<void> {
 
   let jayson = require("jayson/promise");
   let rpc = url.parse(process.env.BITCOIN_RPC);
-  let client = jayson.client.http(rpc);
+  let client = jayson.client.http({
+    ...rpc,
+    timeout: 60_000 // 60 seconds timeout for RPC requests
+  });
   const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, {pragmasProfile: "blockchain"});
 
   let lastProcessedBlock = 0;
