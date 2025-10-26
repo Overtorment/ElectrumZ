@@ -1,12 +1,12 @@
-const url = require("url");
-const fs = require("fs");
+const url = require("node:url");
+const fs = require("node:fs");
 
 import { BigNumber } from "bignumber.js";
 import {
 	DEFAULT_SQLITE_DB_PATH,
 	LAST_PROCESSED_BLOCK_FILE,
 } from "../constants";
-import { openDatabase, UtxoRow } from "../lib/db";
+import { openDatabase, type UtxoRow } from "../lib/db";
 import { computeOutpoint, computeScripthash } from "../lib/scripthash";
 
 export async function workerBlockprocessor(): Promise<void> {
@@ -15,9 +15,9 @@ export async function workerBlockprocessor(): Promise<void> {
 		process.exit();
 	}
 
-	let jayson = require("jayson/promise");
-	let rpc = url.parse(process.env.BITCOIN_RPC);
-	let client = jayson.client.http({
+	const jayson = require("jayson/promise");
+	const rpc = url.parse(process.env.BITCOIN_RPC);
+	const client = jayson.client.http({
 		...rpc,
 		timeout: 60_000, // 60 seconds timeout for RPC requests
 	});
@@ -29,6 +29,7 @@ export async function workerBlockprocessor(): Promise<void> {
 	try {
 		lastProcessedBlock = parseInt(
 			fs.readFileSync(LAST_PROCESSED_BLOCK_FILE).toString("ascii"),
+			10,
 		);
 	} catch {}
 
@@ -44,9 +45,9 @@ export async function workerBlockprocessor(): Promise<void> {
 
 	console.log("Last processed block:", lastProcessedBlock);
 
-	while (1) {
+	while (true) {
 		let nextBlockToProcess: number = lastProcessedBlock + 1;
-		const start = +new Date();
+		const start = Date.now();
 		try {
 			await processBlock(nextBlockToProcess);
 		} catch (error) {
@@ -64,7 +65,7 @@ export async function workerBlockprocessor(): Promise<void> {
 			continue; // skip overwriting LAST_PROCESSED_BLOCK_FILE
 		}
 
-		const end = +new Date();
+		const end = Date.now();
 		console.log("took", (end - start) / 1000, "sec");
 		console.log("================================");
 		lastProcessedBlock = nextBlockToProcess;
@@ -109,7 +110,6 @@ export async function workerBlockprocessor(): Promise<void> {
 				3,
 			]);
 
-			let k = 0;
 			if (responseGetblock?.error) {
 				// no such block
 				await new Promise((r) => setTimeout(r, 5_000));

@@ -1,8 +1,8 @@
-import * as fs from "fs";
-const url = require("url");
-const path = require("path");
+import * as fs from "node:fs";
+const url = require("node:url");
+const path = require("node:path");
 
-import { DEFAULT_SQLITE_DB_PATH, DEFAULT_UTXO_DUMP_FILE } from "../constants";
+import { DEFAULT_UTXO_DUMP_FILE } from "../constants";
 
 export async function dumpUtxo(): Promise<void> {
 	if (!process.env.BITCOIN_RPC) {
@@ -13,9 +13,9 @@ export async function dumpUtxo(): Promise<void> {
 	console.log(`Dumping UTXO...`);
 	const start = Date.now();
 
-	let jayson = require("jayson/promise");
-	let rpc = url.parse(process.env.BITCOIN_RPC);
-	let client = jayson.client.http(rpc);
+	const jayson = require("jayson/promise");
+	const rpc = url.parse(process.env.BITCOIN_RPC);
+	const client = jayson.client.http(rpc);
 
 	try {
 		const getblockchaininfo = await client.request("getblockchaininfo", []);
@@ -38,7 +38,7 @@ export async function dumpUtxo(): Promise<void> {
 
 	if (fs.existsSync(`${absolutePath}.incomplete`)) {
 		console.log(
-			"dumping aborted, incomplete file ${absolutePath}.incomplete exists",
+			`dumping aborted, incomplete file ${absolutePath}.incomplete exists`,
 		);
 		process.exit(1);
 	}

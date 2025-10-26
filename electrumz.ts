@@ -1,6 +1,6 @@
-import { DbHandle, openDatabase } from "./lib/db";
+import { type DbHandle, openDatabase } from "./lib/db";
 import { DEFAULT_SQLITE_DB_PATH, DEFAULT_UTXO_DUMP_FILE } from "./constants";
-import * as fs from "fs";
+import * as fs from "node:fs";
 import { addIndexes } from "./actions/add-index";
 import { serve } from "./actions/serve";
 import { workerBlockprocessor } from "./actions/worker-blockprocessor";
@@ -35,7 +35,7 @@ try {
 		console.log("empty sqlite database");
 		appState = EAppState.CLEAN_SLATE;
 	}
-} catch (error) {
+} catch {
 	// failure. no sqlite database, its a fresh install
 	console.log("no sqlite database");
 	appState = EAppState.CLEAN_SLATE;

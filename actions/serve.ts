@@ -1,6 +1,6 @@
 import { Server } from "jayson/promise";
 import { Cache } from "../lib/cache";
-const url = require("url");
+const url = require("node:url");
 import { readFileSync, existsSync } from "node:fs";
 import { openDatabase } from "../lib/db";
 import { DEFAULT_SQLITE_DB_PATH } from "../constants";
@@ -12,9 +12,9 @@ export async function serve(): Promise<void> {
 		process.exit();
 	}
 
-	let jayson = require("jayson/promise");
-	let rpc = url.parse(process.env.BITCOIN_RPC);
-	let rpcClient = jayson.client.http(rpc);
+	const jayson = require("jayson/promise");
+	const rpc = url.parse(process.env.BITCOIN_RPC);
+	const rpcClient = jayson.client.http(rpc);
 
 	const responseGetIndexInfo = await rpcClient.request("getindexinfo", []);
 	const txindexEnabled = !!(
@@ -185,12 +185,12 @@ export async function serve(): Promise<void> {
 					value &&
 					typeof value === "object" &&
 					!Array.isArray(value) &&
-					// @ts-ignore - runtime check for JSON-RPC shape
+					// @ts-expect-error - runtime check for JSON-RPC shape
 					typeof (value as any).method === "string" &&
-					// @ts-ignore - if jsonrpc is absent, add it
+					// @ts-expect-error - if jsonrpc is absent, add it
 					(value as any).jsonrpc === undefined
 				) {
-					// @ts-ignore
+					// @ts-expect-error
 					(value as any).jsonrpc = "2.0";
 				}
 
@@ -214,7 +214,7 @@ export async function serve(): Promise<void> {
 		const originalWrite = socket.write.bind(socket);
 		const originalEnd = socket.end.bind(socket);
 
-		socket.write = function (data: any, ...args: any[]) {
+		socket.write = (data: any, ...args: any[]) => {
 			if (typeof data === "string") {
 				const trimmed = data.trim();
 				if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -224,7 +224,7 @@ export async function serve(): Promise<void> {
 			return originalWrite(data, ...args);
 		};
 
-		socket.end = function (data: any, ...args: any[]) {
+		socket.end = (data: any, ...args: any[]) => {
 			if (data && typeof data === "string") {
 				const trimmed = data.trim();
 				if (trimmed.startsWith("{") || trimmed.startsWith("[")) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { openDatabase, type UtxoRow } from "../lib/db";
-import { existsSync, writeFileSync } from "fs";
-import { computeOutpointBuf, computeScripthash } from "../lib/scripthash";
+import { existsSync, writeFileSync } from "node:fs";
+import { computeScripthash } from "../lib/scripthash";
 import { StreamingBinaryReader } from "../lib/StreamingBinaryReader";
 import {
 	DEFAULT_SQLITE_DB_PATH,

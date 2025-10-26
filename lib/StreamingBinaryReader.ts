@@ -1,4 +1,4 @@
-import { openSync, readSync, closeSync, statSync } from "fs";
+import { openSync, readSync, closeSync, statSync } from "node:fs";
 
 export class StreamingBinaryReader {
 	private fd: number | null = null;

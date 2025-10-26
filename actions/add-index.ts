@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { DbHandle, openDatabase } from "../lib/db";
-import { existsSync } from "fs";
+import { type DbHandle, openDatabase } from "../lib/db";
+import { existsSync } from "node:fs";
 import { DEFAULT_SQLITE_DB_PATH } from "../constants";
 
 export async function addIndexes(): Promise<void> {
@@ -14,7 +14,7 @@ export async function addIndexes(): Promise<void> {
 	const start = Date.now();
 	let handle: DbHandle;
 	let c = 2;
-	while (1) {
+	while (true) {
 		try {
 			handle = openDatabase(DEFAULT_SQLITE_DB_PATH, {
 				pragmasProfile: "indexbuild",

@@ -1,5 +1,5 @@
-import { Database, Statement } from "bun:sqlite";
-import { availableParallelism } from "os";
+import { Database, type Statement } from "bun:sqlite";
+import { availableParallelism } from "node:os";
 
 export type UtxoRow = [Buffer, number, number, Buffer];
 
