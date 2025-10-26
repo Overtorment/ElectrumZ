@@ -19,8 +19,24 @@ export async function workerBlockprocessor(): Promise<void> {
 	const rpc = url.parse(process.env.BITCOIN_RPC);
 	const client = jayson.client.http({
 		...rpc,
-		timeout: 60_000, // 60 seconds timeout for RPC requests
 	});
+
+	// Helper function to add timeout to RPC requests
+	const requestWithTimeout = async (
+		method: string,
+		params: any[],
+		timeoutMs = 30_000,
+	) => {
+		return Promise.race([
+			client.request(method, params),
+			new Promise((_, reject) =>
+				setTimeout(
+					() => reject(new Error(`RPC request timeout: ${method}`)),
+					timeoutMs,
+				),
+			),
+		]);
+	};
 	const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, {
 		pragmasProfile: "blockchain",
 	});
@@ -99,13 +115,13 @@ export async function workerBlockprocessor(): Promise<void> {
 		const deleteBatchWithoutScripthash: Buffer[] = [];
 
 		try {
-			const responseGetblockhash = await client.request("getblockhash", [
+			const responseGetblockhash = await requestWithTimeout("getblockhash", [
 				blockNum,
 			]);
 			// "If verbosity is 2, returns an Object with information about block <hash> and information about each transaction.
 			// If verbosity is 3, returns an Object with information about block <hash> and information about each transaction, including
 			// prevout information for inputs (only for unpruned blocks in the current best chain)"
-			const responseGetblock = await client.request("getblock", [
+			const responseGetblock = await requestWithTimeout("getblock", [
 				responseGetblockhash.result,
 				3,
 			]);
