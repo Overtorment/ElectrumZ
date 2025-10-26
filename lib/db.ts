@@ -16,7 +16,18 @@ export interface DbHandle {
 	checkpoint(mode?: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE"): void;
 }
 
-export function openDatabase(path: string, opts?: { createSchema?: boolean; pragmasProfile?: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain" }): DbHandle {
+export function openDatabase(
+	path: string,
+	opts?: {
+		createSchema?: boolean;
+		pragmasProfile?:
+			| "bulkload"
+			| "default"
+			| "readonly"
+			| "indexbuild"
+			| "blockchain";
+	},
+): DbHandle {
 	const db = new Database(path);
 	const profile = opts?.pragmasProfile ?? "default";
 	applyPragmas(db, profile);
@@ -26,7 +37,10 @@ export function openDatabase(path: string, opts?: { createSchema?: boolean; prag
 	return wrap(db);
 }
 
-function applyPragmas(db: Database, profile: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain"): void {
+function applyPragmas(
+	db: Database,
+	profile: "bulkload" | "default" | "readonly" | "indexbuild" | "blockchain",
+): void {
 	console.log(`Applying SQLite PRAGMA profile: ${profile}`);
 	const threads = availableParallelism();
 	if (profile === "bulkload") {
@@ -93,30 +107,44 @@ PRAGMA foreign_keys=ON;
 }
 
 function createSchema(db: Database): void {
-	db.exec("CREATE TABLE IF NOT EXISTS utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)");
+	db.exec(
+		"CREATE TABLE IF NOT EXISTS utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)",
+	);
 }
 
 function wrap(db: Database): DbHandle {
 	return {
-		 db,
-		 close() { db.close(); },
-		 beginImmediate() { db.exec("BEGIN IMMEDIATE"); },
-		 commit() { db.exec("COMMIT"); },
-		 rollback() { db.exec("ROLLBACK"); },
-		 prepareInsert() { return db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)"); },
-		 insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>) {
+		db,
+		close() {
+			db.close();
+		},
+		beginImmediate() {
+			db.exec("BEGIN IMMEDIATE");
+		},
+		commit() {
+			db.exec("COMMIT");
+		},
+		rollback() {
+			db.exec("ROLLBACK");
+		},
+		prepareInsert() {
+			return db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");
+		},
+		insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>) {
 			const local = stmt ?? db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");
 			for (const r of rows) local.run(...r);
 			if (!stmt) local.finalize?.();
-		 },
-		 createSchema() { createSchema(db); },
-		 ensureCompositeIndex() {
-			 db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_scripthash_outpoint ON utxos(scripthash, outpoint)"); 
-		 },
-		 checkpoint(mode: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE" = "TRUNCATE") {
-			 db.exec(`PRAGMA wal_checkpoint(${mode})`);
-		 },
+		},
+		createSchema() {
+			createSchema(db);
+		},
+		ensureCompositeIndex() {
+			db.exec(
+				"CREATE INDEX IF NOT EXISTS idx_utxos_scripthash_outpoint ON utxos(scripthash, outpoint)",
+			);
+		},
+		checkpoint(mode: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE" = "TRUNCATE") {
+			db.exec(`PRAGMA wal_checkpoint(${mode})`);
+		},
 	};
 }
-
-

@@ -10,9 +10,11 @@ export function computeOutpoint(txid: string, n: number): Buffer {
 	return Buffer.concat([Buffer.from(txid, "hex"), indexBuf]);
 }
 
-export function computeOutpointBuf(prevoutHashBuf: Buffer, prevoutIndex: number): Buffer {
-    const indexBuf = Buffer.allocUnsafe(4);
-    indexBuf.writeUInt32LE(prevoutIndex, 0);
-    return Buffer.concat([prevoutHashBuf, indexBuf]);
+export function computeOutpointBuf(
+	prevoutHashBuf: Buffer,
+	prevoutIndex: number,
+): Buffer {
+	const indexBuf = Buffer.allocUnsafe(4);
+	indexBuf.writeUInt32LE(prevoutIndex, 0);
+	return Buffer.concat([prevoutHashBuf, indexBuf]);
 }
-
