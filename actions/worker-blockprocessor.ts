@@ -8,6 +8,7 @@ import {
 } from "../constants";
 import { openDatabase, type UtxoRow } from "../lib/db";
 import { computeOutpoint, computeScripthash } from "../lib/scripthash";
+import { requestWithTimeout } from "../lib/rpc-timeout";
 
 export async function workerBlockprocessor(): Promise<void> {
 	if (!process.env.BITCOIN_RPC) {
@@ -20,23 +21,6 @@ export async function workerBlockprocessor(): Promise<void> {
 	const client = jayson.client.http({
 		...rpc,
 	});
-
-	// Helper function to add timeout to RPC requests
-	const requestWithTimeout = async (
-		method: string,
-		params: any[],
-		timeoutMs = 30_000,
-	) => {
-		return Promise.race([
-			client.request(method, params),
-			new Promise((_, reject) =>
-				setTimeout(
-					() => reject(new Error(`RPC request timeout: ${method}`)),
-					timeoutMs,
-				),
-			),
-		]);
-	};
 	const dbHandle = openDatabase(DEFAULT_SQLITE_DB_PATH, {
 		pragmasProfile: "blockchain",
 	});
@@ -115,13 +99,15 @@ export async function workerBlockprocessor(): Promise<void> {
 		const deleteBatchWithoutScripthash: Buffer[] = [];
 
 		try {
-			const responseGetblockhash = await requestWithTimeout("getblockhash", [
-				blockNum,
-			]);
+			const responseGetblockhash = await requestWithTimeout(
+				client,
+				"getblockhash",
+				[blockNum],
+			);
 			// "If verbosity is 2, returns an Object with information about block <hash> and information about each transaction.
 			// If verbosity is 3, returns an Object with information about block <hash> and information about each transaction, including
 			// prevout information for inputs (only for unpruned blocks in the current best chain)"
-			const responseGetblock = await requestWithTimeout("getblock", [
+			const responseGetblock = await requestWithTimeout(client, "getblock", [
 				responseGetblockhash.result,
 				3,
 			]);

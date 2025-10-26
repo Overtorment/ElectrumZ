@@ -3,6 +3,7 @@ const url = require("node:url");
 const path = require("node:path");
 
 import { DEFAULT_UTXO_DUMP_FILE } from "../constants";
+import { requestWithTimeout } from "../lib/rpc-timeout";
 
 export async function dumpUtxo(): Promise<void> {
 	if (!process.env.BITCOIN_RPC) {
@@ -17,25 +18,12 @@ export async function dumpUtxo(): Promise<void> {
 	const rpc = url.parse(process.env.BITCOIN_RPC);
 	const client = jayson.client.http(rpc);
 
-	// Helper function to add timeout to RPC requests
-	const requestWithTimeout = async (
-		method: string,
-		params: any[],
-		timeoutMs = 30_000,
-	) => {
-		return Promise.race([
-			client.request(method, params),
-			new Promise((_, reject) =>
-				setTimeout(
-					() => reject(new Error(`RPC request timeout: ${method}`)),
-					timeoutMs,
-				),
-			),
-		]);
-	};
-
 	try {
-		const getblockchaininfo = await requestWithTimeout("getblockchaininfo", []);
+		const getblockchaininfo = await requestWithTimeout(
+			client,
+			"getblockchaininfo",
+			[],
+		);
 		if (getblockchaininfo?.result?.chain !== "main") {
 			console.log("bitcoind not ready:", getblockchaininfo);
 			process.exit(1);
@@ -60,7 +48,7 @@ export async function dumpUtxo(): Promise<void> {
 		process.exit(1);
 	}
 
-	await requestWithTimeout("dumptxoutset", [absolutePath, "latest"]);
+	await requestWithTimeout(client, "dumptxoutset", [absolutePath, "latest"]);
 
 	const elapsed = ((Date.now() - start) / 1000).toFixed(3);
 	console.log(`dumped UTXO in ${elapsed}s.`);

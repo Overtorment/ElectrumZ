@@ -4,6 +4,7 @@ const url = require("node:url");
 import { readFileSync, existsSync } from "node:fs";
 import { openDatabase } from "../lib/db";
 import { DEFAULT_SQLITE_DB_PATH } from "../constants";
+import { requestWithTimeout } from "../lib/rpc-timeout";
 const pckg = require("../package.json");
 
 export async function serve(): Promise<void> {
@@ -16,7 +17,11 @@ export async function serve(): Promise<void> {
 	const rpc = url.parse(process.env.BITCOIN_RPC);
 	const rpcClient = jayson.client.http(rpc);
 
-	const responseGetIndexInfo = await rpcClient.request("getindexinfo", []);
+	const responseGetIndexInfo = await requestWithTimeout(
+		rpcClient,
+		"getindexinfo",
+		[],
+	);
 	const txindexEnabled = !!(
 		responseGetIndexInfo?.result?.txindex?.synced === true
 	);
@@ -79,10 +84,11 @@ export async function serve(): Promise<void> {
 				const cached = txcache.get(cacheKey);
 				if (cached) return cached; // hit
 
-				const response = await rpcClient.request("getrawtransaction", [
-					params[0],
-					!!params[1],
-				]);
+				const response = await requestWithTimeout(
+					rpcClient,
+					"getrawtransaction",
+					[params[0], !!params[1]],
+				);
 				if (response.error) {
 					throw server.error(
 						501,
@@ -93,9 +99,11 @@ export async function serve(): Promise<void> {
 				return response.result;
 			},
 			"blockchain.transaction.broadcast": async (params: [string]) => {
-				const response = await rpcClient.request("sendrawtransaction", [
-					params[0],
-				]);
+				const response = await requestWithTimeout(
+					rpcClient,
+					"sendrawtransaction",
+					[params[0]],
+				);
 				return response.result;
 			},
 			"blockchain.scripthash.subscribe": async () => null,
