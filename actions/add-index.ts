@@ -24,7 +24,7 @@ export async function addIndexes(): Promise<void> {
 			console.log("error opening db:", e.message);
 			console.log("retrying...");
 			await new Promise((r) => setTimeout(r, c * 1_000)); // sleep
-			if (c++ > 10) {
+			if (c++ > 30) {
 				console.log("giving up");
 				process.exit(1);
 			}

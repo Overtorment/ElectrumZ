@@ -208,7 +208,7 @@ export async function utxoToSqlite(): Promise<void> {
 		indexBuf.writeUInt32LE(prevoutIndex, 0);
 		const outpointBuf = Buffer.concat([prevoutHashBuf, indexBuf]);
 		amount >= +(process.env.DUST_LIMIT ?? 1) &&
-			writeBatch.push([outpointBuf, amount, height, scripthash]);
+			writeBatch.push([outpointBuf, amount, height, scripthash, script]);
 		if (height > maxHeight) maxHeight = height;
 		coinsPerHashLeft -= 1;
 

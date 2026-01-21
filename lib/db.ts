@@ -1,7 +1,7 @@
 import { Database, type Statement } from "bun:sqlite";
 import { availableParallelism } from "node:os";
 
-export type UtxoRow = [Buffer, number, number, Buffer];
+export type UtxoRow = [Buffer, number, number, Buffer, Buffer];
 
 export interface DbHandle {
 	readonly db: Database;
@@ -108,8 +108,10 @@ PRAGMA foreign_keys=ON;
 
 function createSchema(db: Database): void {
 	db.exec(
-		"CREATE TABLE IF NOT EXISTS utxos(outpoint BLOB, value INT, height INT, scripthash BLOB)",
+		"CREATE TABLE IF NOT EXISTS utxos(outpoint BLOB, value INT, height INT, scripthash BLOB, script BLOB)",
 	);
+	db.exec("CREATE TABLE IF NOT EXISTS tweaks(txid BLOB, tweak BLOB)");
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tweaks_txid ON tweaks(txid)");
 }
 
 function wrap(db: Database): DbHandle {
@@ -128,10 +130,11 @@ function wrap(db: Database): DbHandle {
 			db.exec("ROLLBACK");
 		},
 		prepareInsert() {
-			return db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");
+			return db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?, ?)");
 		},
 		insertMany(rows: UtxoRow[], stmt?: Statement<UtxoRow>) {
-			const local = stmt ?? db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?)");
+			const local =
+				stmt ?? db.prepare("INSERT INTO utxos VALUES(?, ?, ?, ?, ?)");
 			for (const r of rows) local.run(...r);
 			if (!stmt) local.finalize?.();
 		},
@@ -142,6 +145,7 @@ function wrap(db: Database): DbHandle {
 			db.exec(
 				"CREATE INDEX IF NOT EXISTS idx_utxos_scripthash_outpoint ON utxos(scripthash, outpoint)",
 			);
+			db.exec("CREATE INDEX IF NOT EXISTS idx_utxos_height ON utxos(height)");
 		},
 		checkpoint(mode: "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE" = "TRUNCATE") {
 			db.exec(`PRAGMA wal_checkpoint(${mode})`);

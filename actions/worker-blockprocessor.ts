@@ -1,22 +1,27 @@
 const url = require("node:url");
 const fs = require("node:fs");
+const jayson = require("jayson/promise");
 
 import { BigNumber } from "bignumber.js";
 import {
 	DEFAULT_SQLITE_DB_PATH,
 	LAST_PROCESSED_BLOCK_FILE,
 } from "../constants";
-import { openDatabase, type UtxoRow } from "../lib/db";
+import { DbHandle, openDatabase, type UtxoRow } from "../lib/db";
 import { computeOutpoint, computeScripthash } from "../lib/scripthash";
 import { requestWithTimeout } from "../lib/rpc-timeout";
+import { Client } from "jayson";
 
+/**
+ * this worker is responsible for processing blocks and updating the database with the new utxos,
+ * also deleting the utxos that are spent in the block
+ */
 export async function workerBlockprocessor(): Promise<void> {
 	if (!process.env.BITCOIN_RPC) {
 		console.log("not all env variables set");
 		process.exit();
 	}
 
-	const jayson = require("jayson/promise");
 	const rpc = url.parse(process.env.BITCOIN_RPC);
 	const client = jayson.client.http({
 		...rpc,
@@ -49,7 +54,7 @@ export async function workerBlockprocessor(): Promise<void> {
 		let nextBlockToProcess: number = lastProcessedBlock + 1;
 		const start = Date.now();
 		try {
-			await processBlock(nextBlockToProcess);
+			await processBlock(dbHandle, client, nextBlockToProcess);
 		} catch (error) {
 			console.warn(
 				"exception when processing block: " +
@@ -71,134 +76,144 @@ export async function workerBlockprocessor(): Promise<void> {
 		lastProcessedBlock = nextBlockToProcess;
 		fs.writeFileSync(LAST_PROCESSED_BLOCK_FILE, lastProcessedBlock.toString());
 	}
+}
 
-	async function processBlock(blockNum: number) {
-		console.log("processing block", +blockNum);
+async function processBlock(
+	dbHandle: DbHandle,
+	rpcClient: Client,
+	blockNum: number,
+) {
+	console.log("processing block", +blockNum);
 
-		dbHandle.beginImmediate();
+	dbHandle.beginImmediate();
 
-		// Prepare all statements once outside the loops for efficiency
-		const insertStmt = dbHandle.prepareInsert();
-		const deleteWithScripthashStmt = dbHandle.db.prepare(
-			"DELETE FROM utxos WHERE outpoint = ? AND scripthash = ?",
+	// Prepare all statements once outside the loops for efficiency
+	const insertStmt = dbHandle.prepareInsert();
+	const deleteWithScripthashStmt = dbHandle.db.prepare(
+		"DELETE FROM utxos WHERE outpoint = ? AND scripthash = ?",
+	);
+	const deleteWithoutScripthashStmt = dbHandle.db.prepare(
+		"DELETE FROM utxos WHERE outpoint = ?",
+	);
+
+	const insertMany = (rows: UtxoRow[]) => {
+		dbHandle.insertMany(rows, insertStmt);
+	};
+	const writeBatch: UtxoRow[] = [];
+
+	// Collect DELETE operations for batching
+	const deleteBatchWithScripthash: Array<{
+		outpoint: Buffer;
+		scripthash: Buffer;
+	}> = [];
+	const deleteBatchWithoutScripthash: Buffer[] = [];
+
+	try {
+		const responseGetblockhash = await requestWithTimeout(
+			rpcClient,
+			"getblockhash",
+			[blockNum],
 		);
-		const deleteWithoutScripthashStmt = dbHandle.db.prepare(
-			"DELETE FROM utxos WHERE outpoint = ?",
-		);
+		// "If verbosity is 2, returns an Object with information about block <hash> and information about each transaction.
+		// If verbosity is 3, returns an Object with information about block <hash> and information about each transaction, including
+		// prevout information for inputs (only for unpruned blocks in the current best chain)"
+		const responseGetblock = await requestWithTimeout(rpcClient, "getblock", [
+			responseGetblockhash.result,
+			3,
+		]);
 
-		const insertMany = (rows: UtxoRow[]) => {
-			dbHandle.insertMany(rows, insertStmt);
-		};
-		const writeBatch: UtxoRow[] = [];
-
-		// Collect DELETE operations for batching
-		const deleteBatchWithScripthash: Array<{
-			outpoint: Buffer;
-			scripthash: Buffer;
-		}> = [];
-		const deleteBatchWithoutScripthash: Buffer[] = [];
-
-		try {
-			const responseGetblockhash = await requestWithTimeout(
-				client,
-				"getblockhash",
-				[blockNum],
-			);
-			// "If verbosity is 2, returns an Object with information about block <hash> and information about each transaction.
-			// If verbosity is 3, returns an Object with information about block <hash> and information about each transaction, including
-			// prevout information for inputs (only for unpruned blocks in the current best chain)"
-			const responseGetblock = await requestWithTimeout(client, "getblock", [
-				responseGetblockhash.result,
-				3,
-			]);
-
-			if (responseGetblock?.error) {
-				// no such block
-				await new Promise((r) => setTimeout(r, 5_000));
-				throw new Error("no such block, sleeping");
-			}
-
-			for (const tx of responseGetblock.result.tx) {
-				// finding what utxos are spent and need deletion:
-				for (const vin of tx.vin) {
-					if (vin.coinbase) {
-						// no utxos spent here, only created
-						continue;
-					}
-
-					const outpointBuf = computeOutpoint(vin.txid, vin.vout);
-
-					if (vin?.prevout?.scriptPubKey?.hex) {
-						// ok we have script so the query will use index
-						const scripthash = computeScripthash(
-							Buffer.from(vin.prevout.scriptPubKey.hex, "hex"),
-						);
-						deleteBatchWithScripthash.push({
-							outpoint: outpointBuf,
-							scripthash,
-						});
-					} else {
-						deleteBatchWithoutScripthash.push(outpointBuf);
-					}
-				}
-
-				// finding what utxos are new and need insertion:
-				for (const vout of tx.vout) {
-					if (vout.scriptPubKey) {
-						const scripthash = computeScripthash(
-							Buffer.from(vout.scriptPubKey.hex, "hex"),
-						);
-						const amount = new BigNumber(vout.value)
-							.multipliedBy(100_000_000)
-							.toNumber();
-
-						const outpointBuf = computeOutpoint(tx.txid, vout.n);
-						amount >= +(process.env.DUST_LIMIT ?? 1) &&
-							writeBatch.push([outpointBuf, amount, blockNum, scripthash]);
-					}
-				}
-
-				// if (k++ === 1000) { console.log('tx', JSON.stringify(tx, null, 2)); process.exit(0); }
-			}
-
-			// Execute batched INSERT operations. Inserts must go before deletes, as we might create utxos that will
-			// be spent _in_the_same_block_, so we need to create them first so deletes can find them lates
-			console.log("inserting", writeBatch.length, "utxos");
-			writeBatch.length > 0 && insertMany(writeBatch);
-
-			// Execute batched DELETE operations
-			console.log(
-				"deleting",
-				deleteBatchWithScripthash.length + deleteBatchWithoutScripthash.length,
-				"utxos",
-			);
-			for (const { outpoint, scripthash } of deleteBatchWithScripthash) {
-				deleteWithScripthashStmt.run(outpoint, scripthash);
-			}
-			for (const outpoint of deleteBatchWithoutScripthash) {
-				deleteWithoutScripthashStmt.run(outpoint);
-			}
-
-			console.log("commiting to database...");
-			dbHandle.commit();
-
-			// Checkpoint WAL after commit to prevent unbounded WAL growth
-			dbHandle.checkpoint("TRUNCATE");
-		} catch (error) {
-			console.error("Error processing block:", error.message);
-			try {
-				console.log("rolling back");
-				dbHandle.rollback();
-			} catch (rollbackError) {
-				console.error("Error during rollback:", rollbackError);
-			}
-			throw error; // Re-throw to be handled by caller
-		} finally {
-			// Clean up prepared statements
-			deleteWithScripthashStmt.finalize?.();
-			deleteWithoutScripthashStmt.finalize?.();
-			insertStmt.finalize?.();
+		if (responseGetblock?.error) {
+			// no such block
+			await new Promise((r) => setTimeout(r, 5_000));
+			throw new Error("no such block, sleeping");
 		}
+
+		for (const tx of responseGetblock.result.tx) {
+			// finding what utxos are spent and need deletion:
+			for (const vin of tx.vin) {
+				if (vin.coinbase) {
+					// no utxos spent here, only created
+					continue;
+				}
+
+				const outpointBuf = computeOutpoint(vin.txid, vin.vout);
+
+				if (vin?.prevout?.scriptPubKey?.hex) {
+					// ok we have script so the query will use index
+					const scripthash = computeScripthash(
+						Buffer.from(vin.prevout.scriptPubKey.hex, "hex"),
+					);
+					deleteBatchWithScripthash.push({
+						outpoint: outpointBuf,
+						scripthash,
+					});
+				} else {
+					deleteBatchWithoutScripthash.push(outpointBuf);
+				}
+			}
+
+			// finding what utxos are new and need insertion:
+			for (const vout of tx.vout) {
+				if (vout.scriptPubKey) {
+					const scripthash = computeScripthash(
+						Buffer.from(vout.scriptPubKey.hex, "hex"),
+					);
+					const amount = new BigNumber(vout.value)
+						.multipliedBy(100_000_000)
+						.toNumber();
+
+					const outpointBuf = computeOutpoint(tx.txid, vout.n);
+					amount >= +(process.env.DUST_LIMIT ?? 1) &&
+						writeBatch.push([
+							outpointBuf,
+							amount,
+							blockNum,
+							scripthash,
+							Buffer.from(vout.scriptPubKey.hex, "hex"),
+						]);
+				}
+			}
+
+			// if (k++ === 1000) { console.log('tx', JSON.stringify(tx, null, 2)); process.exit(0); }
+		}
+
+		// Execute batched INSERT operations. Inserts must go before deletes, as we might create utxos that will
+		// be spent _in_the_same_block_, so we need to create them first so deletes can find them lates
+		console.log("inserting", writeBatch.length, "utxos");
+		writeBatch.length > 0 && insertMany(writeBatch);
+
+		// Execute batched DELETE operations
+		console.log(
+			"deleting",
+			deleteBatchWithScripthash.length + deleteBatchWithoutScripthash.length,
+			"utxos",
+		);
+		for (const { outpoint, scripthash } of deleteBatchWithScripthash) {
+			deleteWithScripthashStmt.run(outpoint, scripthash);
+		}
+		for (const outpoint of deleteBatchWithoutScripthash) {
+			deleteWithoutScripthashStmt.run(outpoint);
+		}
+
+		console.log("commiting to database...");
+		dbHandle.commit();
+
+		// Checkpoint WAL after commit to prevent unbounded WAL growth
+		dbHandle.checkpoint("TRUNCATE");
+	} catch (error) {
+		console.error("Error processing block:", error.message);
+		try {
+			console.log("rolling back");
+			dbHandle.rollback();
+		} catch (rollbackError) {
+			console.error("Error during rollback:", rollbackError);
+		}
+		throw error; // Re-throw to be handled by caller
+	} finally {
+		// Clean up prepared statements
+		deleteWithScripthashStmt.finalize?.();
+		deleteWithoutScripthashStmt.finalize?.();
+		insertStmt.finalize?.();
 	}
 }
 

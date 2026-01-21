@@ -4,3 +4,4 @@ node_modules/
 *.sqlite*
 .env*
 LAST_PROCESSED_BLOCK
+LAST_PROCESSED_TWEAKS_BLOCK
